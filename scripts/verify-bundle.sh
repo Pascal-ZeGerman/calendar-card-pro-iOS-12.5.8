@@ -35,8 +35,11 @@ else
   echo "PASS: No nullish coalescing (??)"
 fi
 
-# 3. Private class fields — exclude occurrences inside strings/template literals
-if grep -qP '(?<!["\x27`])#[a-zA-Z_$]' "$BUNDLE" 2>/dev/null; then
+# 3. Private class fields — detect actual syntax: access (e.#field) or declaration ({ #field, ; #field)
+# Excluded false positives: CSS hex colors (#f44336) and URL anchors (#static-link) which are inside strings
+# Pattern 1: .#identifier — private field access via property notation
+# Pattern 2: [{ ;]#[a-zA-Z_$] — private field declaration in class body
+if grep -qP '\.(#[a-zA-Z_$])' "$BUNDLE" 2>/dev/null || grep -qP '[{;]\s*#[a-zA-Z_$]' "$BUNDLE" 2>/dev/null; then
   echo "FAIL: Private class fields (#field) found in bundle — Lit 3 may still be in the bundle"
   FAIL=1
 else
@@ -53,7 +56,7 @@ fi
 
 # 5. Bundle size check
 ACTUAL_SIZE_KB=$(du -k "$BUNDLE" | cut -f1)
-MAX_SIZE_KB=9999  # TODO: After first successful build, set to actual size + 20% headroom
+MAX_SIZE_KB=312  # Calibrated: first successful build was 260KB; ceiling = ceil(260 * 1.2) = 312KB
 if [ "$MAX_SIZE_KB" -eq 9999 ]; then
   echo "INFO: Bundle size: ${ACTUAL_SIZE_KB}KB (size ceiling not yet calibrated — update MAX_SIZE_KB after first build)"
 elif [ "$ACTUAL_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
