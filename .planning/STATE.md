@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 1 of 4 (Build Pipeline)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-23 — Completed plan 01-02: Lit 2.8.0 pin and bundle verification script
+Plan: 3 of 3 in current phase (in progress — awaiting checkpoint)
+Status: Paused at checkpoint:human-verify (Task 2 of 2 in plan 01-03)
+Last activity: 2026-02-23 — Task 1 complete: Safari 12 bundle built, verified, committed, pushed
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 2
 - Average duration: ~2 min
-- Total execution time: ~4 min
+- Total execution time: ~9 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-build-pipeline | 2 | ~4 min | ~2 min |
+| 01-build-pipeline | 2 complete + 1 in progress | ~9 min | ~3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~2 min), 01-02 (~2 min)
+- Last 5 plans: 01-01 (~2 min), 01-02 (~2 min), 01-03 in progress (~5 min so far)
 - Trend: Steady
 
 *Updated after each plan completion*
@@ -50,7 +50,8 @@ Recent decisions affecting current work:
 - [01-01]: tsconfig target ES2019 not ES2022 — ES2022 flips useDefineForClassFields to true, breaking Lit @property() decorators
 - [Phase 01-build-pipeline]: Lit 2.8.0 pinned at exact version in npm overrides to prevent transitive version drift breaking iOS 12 compatibility
 - [Phase 01-build-pipeline]: build:no-verify escape hatch kept as permanent script — essential for troubleshooting build pipeline issues
-- [Phase 01-build-pipeline]: Bundle size ceiling MAX_SIZE_KB=9999 placeholder in verify-bundle.sh — enforcement deferred until plan 03 provides first build baseline
+- [01-03]: verify-bundle.sh private class fields regex updated to .#field pattern — original `(?<!["\x27\`])#[a-zA-Z_$]` produced false positives on CSS hex colors (#f44336, #ff9800) and URL anchors (#static-expressions) in minified bundle
+- [01-03]: Bundle size ceiling MAX_SIZE_KB calibrated to 312 (260KB actual + 20% headroom)
 
 ### Pending Todos
 
@@ -58,13 +59,14 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1]: Lit 3 is installed transitively via @material/web despite PROJECT.md claiming Lit 2.2.0 — pinning to Lit 2.8.0 is the first action in Phase 1
 - [Phase 2]: Whether Web Components polyfills are needed cannot be determined without device/BrowserStack testing — establish Safari 12 test environment before Phase 2 begins
 - [Phase 2]: Whether `ha-card` custom element registers correctly on the target iOS 12 HA install is untestable without actual device + HA — plan fallback if needed
-- [Phase 1]: After build, inspect bundle for `.flatMap(` and `Object.fromEntries(` — esbuild transpiles syntax but does not polyfill missing builtins in bundled deps
+- [Phase 1 resolved]: After build, inspect bundle for `.flatMap(` and `Object.fromEntries(` — RESULT: both count 0 in the built bundle, no Phase 2 polyfill action needed
+- [Phase 1 checkpoint]: Device test needed — user must confirm iOS 12.5.8 Safari loads the card without SyntaxError
 
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 01-02-PLAN.md — Lit 2.8.0 pin + bundle verification script
+Stopped at: Plan 01-03 Task 1 complete — paused at checkpoint:human-verify (Task 2: iOS 12 device test)
 Resume file: None
+Resume point: After user provides "approved" or "issue: [description]", run continuation agent for plan 01-03 to finalize SUMMARY.md and close out phase 1
