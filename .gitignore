@@ -37,4 +37,4 @@ tmp/
 .eslintcache
 
 # Ignore documentation build artifacts
-docs/_build/
+docs/_build/.planning/
