@@ -66,5 +66,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 01-01-PLAN.md — source-level Safari 12 prerequisites in place
+Stopped at: Completed 01-02-PLAN.md — Lit 2.8.0 pin + bundle verification script
 Resume file: None

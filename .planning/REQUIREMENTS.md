@@ -10,9 +10,9 @@ Requirements for the iOS 12 compatibility milestone.
 ### Build Pipeline
 
 - [x] **BUILD-01**: Build produces a bundle with no optional chaining (`?.`) or nullish coalescing (`??`) in output (esbuild target: `safari12`)
-- [ ] **BUILD-02**: Lit version is diagnosed — actual version in bundle confirmed, and private class fields are downleveled or Lit is pinned to a compatible version
+- [x] **BUILD-02**: Lit version is diagnosed — actual version in bundle confirmed, and private class fields are downleveled or Lit is pinned to a compatible version
 - [x] **BUILD-03**: TypeScript compilation target aligned with esbuild target for Safari 12 output
-- [ ] **BUILD-04**: Build output verified to parse on Safari 12 (no SyntaxError on script load)
+- [x] **BUILD-04**: Build output verified to parse on Safari 12 (no SyntaxError on script load)
 
 ### Syntax Fixes
 
@@ -67,9 +67,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BUILD-01 | Phase 1 | Complete |
-| BUILD-02 | Phase 1 | Pending |
+| BUILD-02 | Phase 1 | Complete |
 | BUILD-03 | Phase 1 | Complete |
-| BUILD-04 | Phase 1 | Pending |
+| BUILD-04 | Phase 1 | Complete |
 | SYNTAX-01 | Phase 1 | Complete |
 | DISP-01 | Phase 2 | Pending |
 | DISP-02 | Phase 2 | Pending |
