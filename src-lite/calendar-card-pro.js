@@ -2,7 +2,7 @@
  * Calendar Card Pro — Vanilla JS edition for Safari 12+ / iOS 12.5.8
  *
  * Zero dependencies. Custom Elements v1 + Shadow DOM v1.
- * ES2017 only — no optional chaining, nullish coalescing, or private fields.
+ * ES2015+ (Safari 12 compatible) — no optional chaining, nullish coalescing, or private fields.
  */
 
 /* ================================================
@@ -261,20 +261,22 @@ function parseDate(str) {
   return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
 }
 
-/** Check if a value is an all-day event (has date but no dateTime) */
+/** Check if an event is all-day (start has date but no dateTime) */
 function isAllDay(ev) {
-  return !!(ev.start && ev.start.date && !ev.start.dateTime);
+  return !!(ev && ev.start && ev.start.date && !ev.start.dateTime);
 }
 
-/** Get event start as Date */
+/** Get event start as Date, or null if malformed */
 function eventStart(ev) {
+  if (!ev || !ev.start) return null;
   if (ev.start.dateTime) return new Date(ev.start.dateTime);
   if (ev.start.date) return parseDate(ev.start.date);
-  return new Date();
+  return null;
 }
 
-/** Get event end as Date */
+/** Get event end as Date, or null if malformed */
 function eventEnd(ev) {
+  if (!ev || !ev.end) return null;
   if (ev.end.dateTime) return new Date(ev.end.dateTime);
   if (ev.end.date) {
     /* iCal: all-day end date is exclusive, subtract 1 day */
@@ -282,7 +284,7 @@ function eventEnd(ev) {
     d.setDate(d.getDate() - 1);
     return d;
   }
-  return new Date();
+  return null;
 }
 
 /** Format time using Intl (Safari 12 native) */
@@ -342,7 +344,8 @@ function fetchCalendarEvents(hass, entities, start, end) {
         ev._entityConfig = ec;
         return ev;
       });
-    }).catch(function () {
+    }).catch(function (err) {
+      console.error('Calendar Card Pro: fetch failed for ' + ec.entity + ':', err);
       return [];
     });
     promises.push(p);
@@ -376,14 +379,19 @@ function groupEventsByDay(events, cfg) {
     orderedKeys.push(key);
   }
 
+  /* HA may return placeholder events with no start — drop them to avoid phantom entries */
+  events = events.filter(function (ev) {
+    return eventStart(ev) !== null;
+  });
+
   /* Place events into buckets */
   events.forEach(function (ev) {
     var evStart = eventStart(ev);
-    var evEnd = isAllDay(ev) ? eventEnd(ev) : evStart;
+    var evEndDate = eventEnd(ev) || evStart;
 
-    /* For multi-day / all-day events, add to each day in range */
+    /* Add event to each day it spans (all-day and multi-day timed events) */
     var dayIter = new Date(evStart.getFullYear(), evStart.getMonth(), evStart.getDate());
-    var endDay = new Date(evEnd.getFullYear(), evEnd.getMonth(), evEnd.getDate());
+    var endDay = new Date(evEndDate.getFullYear(), evEndDate.getMonth(), evEndDate.getDate());
 
     while (dayIter <= endDay) {
       var k = dateKey(dayIter);
@@ -405,7 +413,7 @@ function groupEventsByDay(events, cfg) {
 
       bucket.events = bucket.events.filter(function (ev) {
         if (isAllDay(ev)) return true;
-        var end = ev.end.dateTime ? new Date(ev.end.dateTime) : null;
+        var end = eventEnd(ev);
         if (!end) return true;
         return end > now;
       });
@@ -509,7 +517,7 @@ function renderCard(days, cfg) {
         /* Past event check */
         var isPast = false;
         if (isToday && !isAllDay(ev)) {
-          var end = ev.end.dateTime ? new Date(ev.end.dateTime) : null;
+          var end = eventEnd(ev);
           if (end && end < now) isPast = true;
         }
         if (isPast) posClass += ' past-event';
@@ -691,11 +699,15 @@ class CalendarCardPro extends HTMLElement {
     var self = this;
     this._isExpanded = false;
     var touchFired = false;
+    var touchTimer = 0;
 
     card.addEventListener('touchend', function (e) {
       touchFired = true;
       e.preventDefault();
       self._toggleExpand();
+      /* Reset flag after click-synthesis window so mouse clicks work again on hybrid devices */
+      clearTimeout(touchTimer);
+      touchTimer = setTimeout(function () { touchFired = false; }, 300);
     });
 
     card.addEventListener('click', function () {
@@ -734,6 +746,8 @@ class CalendarCardPro extends HTMLElement {
     fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (events) {
       self._events = events;
       self._render();
+    }).catch(function (err) {
+      console.error('Calendar Card Pro: render failed:', err);
     });
   }
 
@@ -753,8 +767,8 @@ class CalendarCardPro extends HTMLElement {
   /* --- HA lifecycle --- */
 
   setConfig(config) {
-    if (!config.entities || !config.entities.length) {
-      throw new Error('Calendar Card Pro: "entities" is required');
+    if (!config.entities || !Array.isArray(config.entities) || !config.entities.length) {
+      throw new Error('Calendar Card Pro: "entities" must be a non-empty array');
     }
 
     var cfg = {};
