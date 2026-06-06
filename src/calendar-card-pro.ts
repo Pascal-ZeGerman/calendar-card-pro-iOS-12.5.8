@@ -23,8 +23,8 @@
  */
 
 // Import Lit libraries
-import { LitElement, PropertyValues, TemplateResult } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { LitElement, PropertyValues, TemplateResult, html } from 'lit';
+import { customElement, property, state } from 'lit/decorators.js';
 
 // Import all types via namespace for cleaner imports
 import * as Config from './config/config';
@@ -86,6 +86,16 @@ class CalendarCardPro extends LitElement {
     hourly: {},
   };
 
+  // Diagnostics state (only populated/rendered when config.debug is true).
+  // Used to surface the real failure on devices without a JS console (iOS 12).
+  @state() private _diag: {
+    timeWindow?: { start: string; end: string };
+    rawCount?: number;
+    processedCount?: number;
+    lastError?: { stage: string; message: string; stack?: string };
+    globalErrors: string[];
+  } = { globalErrors: [] };
+
   /**
    * Static method that returns a new instance of the editor
    * This is how Home Assistant discovers and loads the editor
@@ -108,6 +118,10 @@ class CalendarCardPro extends LitElement {
   private _holdTriggered = false;
   private _holdTimer: number | null = null;
   private _holdIndicator: HTMLElement | null = null;
+
+  // Bound global error listeners, attached only in debug mode
+  private _onWindowError?: (ev: ErrorEvent) => void;
+  private _onUnhandledRejection?: (ev: PromiseRejectionEvent) => void;
 
   //-----------------------------------------------------------------------------
   // COMPUTED GETTERS
@@ -164,6 +178,26 @@ class CalendarCardPro extends LitElement {
     super.connectedCallback();
     Logger.debug('Component connected');
 
+    // In debug mode, capture uncaught errors so they appear in the on-screen
+    // diagnostics panel even when they happen outside our try/catch blocks
+    // (e.g. a built-in method unsupported by Safari 12, or an Intl quirk).
+    if (this.config.debug && !this._onWindowError) {
+      this._onWindowError = (ev: ErrorEvent) => {
+        const detail = ev.error && ev.error.stack ? ev.error.stack : ev.message;
+        this._recordGlobalError(`window.onerror: ${detail}`);
+      };
+      this._onUnhandledRejection = (ev: PromiseRejectionEvent) => {
+        const reason = ev.reason;
+        const detail =
+          reason && reason.stack
+            ? reason.stack
+            : String(reason && reason.message ? reason.message : reason);
+        this._recordGlobalError(`unhandledrejection: ${detail}`);
+      };
+      window.addEventListener('error', this._onWindowError);
+      window.addEventListener('unhandledrejection', this._onUnhandledRejection);
+    }
+
     // Set up refresh timer
     this.startRefreshTimer();
 
@@ -202,7 +236,58 @@ class CalendarCardPro extends LitElement {
     // Remove listeners
     document.removeEventListener('visibilitychange', this._handleVisibilityChange);
 
+    // Remove debug global error listeners if they were attached
+    if (this._onWindowError) {
+      window.removeEventListener('error', this._onWindowError);
+      this._onWindowError = undefined;
+    }
+    if (this._onUnhandledRejection) {
+      window.removeEventListener('unhandledrejection', this._onUnhandledRejection);
+      this._onUnhandledRejection = undefined;
+    }
+
     Logger.debug('Component disconnected');
+  }
+
+  /**
+   * Record an uncaught/global error into the diagnostics panel (debug mode).
+   * Keeps only the most recent entries to avoid unbounded growth.
+   */
+  private _recordGlobalError(message: string): void {
+    const next = this._diag.globalErrors.concat(message).slice(-10);
+    this._diag = { ...this._diag, globalErrors: next };
+  }
+
+  /**
+   * Merge fetch-pipeline diagnostics (time window, raw/processed counts) into
+   * the diagnostics state. Called by fetchEventData in debug mode.
+   */
+  private _recordFetchDiag(d: EventUtils.FetchDiagnostics): void {
+    const patch: Partial<typeof this._diag> = {};
+    if (d.timeWindow) {
+      patch.timeWindow = {
+        start: d.timeWindow.start.toISOString(),
+        end: d.timeWindow.end.toISOString(),
+      };
+    }
+    if (typeof d.rawCount === 'number') patch.rawCount = d.rawCount;
+    if (typeof d.processedCount === 'number') patch.processedCount = d.processedCount;
+    this._diag = { ...this._diag, ...patch };
+  }
+
+  /**
+   * Record a staged error (fetch/render) into the diagnostics state.
+   */
+  private _recordError(stage: string, error: unknown): void {
+    const err = error as { message?: string; stack?: string };
+    this._diag = {
+      ...this._diag,
+      lastError: {
+        stage,
+        message: err && err.message ? err.message : String(error),
+        stack: err && err.stack ? err.stack : undefined,
+      },
+    };
   }
 
   updated(changedProps: PropertyValues) {
@@ -494,6 +579,7 @@ class CalendarCardPro extends LitElement {
         this.config,
         this._instanceId,
         force,
+        this.config.debug ? (d) => this._recordFetchDiag(d) : undefined,
       );
 
       // Critical: Complete loading state before updating events
@@ -508,6 +594,9 @@ class CalendarCardPro extends LitElement {
     } catch (error) {
       Logger.error('Failed to update events:', error);
       this.isLoading = false;
+      if (this.config.debug) {
+        this._recordError('fetch', error);
+      }
     }
 
     // Ensure we have weather forecast subscriptions too
@@ -553,41 +642,90 @@ class CalendarCardPro extends LitElement {
     // Determine card content based on state
     let content: TemplateResult;
 
-    if (this.isLoading) {
-      // Loading state
+    // Wrap the data-driven branches so a render-time exception (e.g. in date
+    // grouping/formatting on an old engine) is captured into diagnostics instead
+    // of bubbling into Lit and blanking the card.
+    try {
+      if (this.isLoading) {
+        // Loading state
+        content = Render.renderCardContent('loading', this.effectiveLanguage);
+      } else if (!this.safeHass || !this.config.entities.length) {
+        // Error state - missing entities
+        content = Render.renderCardContent('error', this.effectiveLanguage);
+      } else if (this.events.length === 0) {
+        // Even with no events, use the regular groupEventsByDay function
+        // which now handles empty API results correctly
+        const groupedEmptyDays = EventUtils.groupEventsByDay(
+          [], // Empty events array
+          this.config,
+          this.isExpanded,
+          this.effectiveLanguage,
+        );
+        content = Render.renderGroupedEvents(
+          groupedEmptyDays,
+          this.config,
+          this.effectiveLanguage,
+          this.weatherForecasts,
+          this.safeHass,
+        );
+      } else {
+        // Normal state with events - use renderGroupedEvents to handle week numbers and separators
+        content = Render.renderGroupedEvents(
+          this.groupedEvents,
+          this.config,
+          this.effectiveLanguage,
+          this.weatherForecasts,
+          this.safeHass,
+        );
+      }
+    } catch (error) {
+      Logger.error('Render failed:', error);
+      if (this.config.debug) {
+        this._recordError('render', error);
+      }
+      // Fall back to the (safe) loading/empty content so the card still renders
       content = Render.renderCardContent('loading', this.effectiveLanguage);
-    } else if (!this.safeHass || !this.config.entities.length) {
-      // Error state - missing entities
-      content = Render.renderCardContent('error', this.effectiveLanguage);
-    } else if (this.events.length === 0) {
-      // Even with no events, use the regular groupEventsByDay function
-      // which now handles empty API results correctly
-      const groupedEmptyDays = EventUtils.groupEventsByDay(
-        [], // Empty events array
-        this.config,
-        this.isExpanded,
-        this.effectiveLanguage,
-      );
-      content = Render.renderGroupedEvents(
-        groupedEmptyDays,
-        this.config,
-        this.effectiveLanguage,
-        this.weatherForecasts,
-        this.safeHass,
-      );
-    } else {
-      // Normal state with events - use renderGroupedEvents to handle week numbers and separators
-      content = Render.renderGroupedEvents(
-        this.groupedEvents,
-        this.config,
-        this.effectiveLanguage,
-        this.weatherForecasts,
-        this.safeHass,
-      );
+    }
+
+    // In debug mode, prepend the diagnostics panel above the card content
+    if (this.config.debug) {
+      content = html`${this._renderDiagnosticsPanel()}${content}`;
     }
 
     // Render main card structure with content
     return Render.renderMainCardStructure(customStyles, this.config.title, content, handlers);
+  }
+
+  /**
+   * Render the on-screen diagnostics panel (debug mode only).
+   * Intentionally uses only basic, widely-supported APIs so it renders even on
+   * very old engines (iOS 12 Safari). Text is selectable for easy transcription.
+   */
+  private _renderDiagnosticsPanel(): TemplateResult {
+    const d = this._diag;
+    const tw = d.timeWindow ? `${d.timeWindow.start} → ${d.timeWindow.end}` : '(not reached)';
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '(no navigator)';
+    const panelStyle =
+      'user-select:text;-webkit-user-select:text;white-space:pre-wrap;word-break:break-word;' +
+      'font-family:monospace;font-size:11px;line-height:1.4;padding:8px;margin:0 0 8px 0;' +
+      'border:1px solid #f00;border-radius:6px;background:rgba(255,0,0,0.06);color:var(--primary-text-color);';
+    return html`
+      <div style="${panelStyle}">
+        <div><strong>calendar-card-pro diagnostics</strong> (v${Constants.VERSION.CURRENT})</div>
+        <div>UA: ${ua}</div>
+        <div>events.length: ${this.events.length} | isLoading: ${String(this.isLoading)}</div>
+        <div>time window: ${tw}</div>
+        <div>rawCount (fetched): ${d.rawCount === undefined ? '—' : d.rawCount}</div>
+        <div>processedCount: ${d.processedCount === undefined ? '—' : d.processedCount}</div>
+        <div>
+          lastError:
+          ${d.lastError
+            ? `[${d.lastError.stage}] ${d.lastError.message}${d.lastError.stack ? '\n' + d.lastError.stack : ''}`
+            : 'none'}
+        </div>
+        <div>globalErrors: ${d.globalErrors.length ? d.globalErrors.join('\n\n') : 'none'}</div>
+      </div>
+    `;
   }
 }
 

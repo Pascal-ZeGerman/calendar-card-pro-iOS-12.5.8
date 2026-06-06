@@ -24,6 +24,11 @@ export interface Config {
   split_multiday_events: boolean;
   language?: string;
 
+  // Diagnostics: when true, render an on-screen panel exposing the event
+  // fetch/parse pipeline state (used to debug devices without a JS console,
+  // e.g. iOS 12 Safari).
+  debug?: boolean;
+
   // Header
   title?: string;
   title_font_size?: string;
