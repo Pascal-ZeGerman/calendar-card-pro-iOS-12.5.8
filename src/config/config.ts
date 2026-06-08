@@ -28,7 +28,7 @@ export const DEFAULT_CONFIG: Types.Config = {
   language: undefined,
 
   // Diagnostics (off by default)
-  debug: false,
+  show_debug_panel: false,
 
   // Header
   title: undefined,

@@ -28,6 +28,23 @@ export interface FetchDiagnostics {
 }
 
 /**
+ * Invoke a diagnostics callback with hard isolation. Diagnostics observe the
+ * fetch — they must never break it, so a handler exception is swallowed (and
+ * logged) rather than propagated up the await chain.
+ */
+function notifyDiag(
+  onDiag: ((d: FetchDiagnostics) => void) | undefined,
+  d: FetchDiagnostics,
+): void {
+  if (!onDiag) return;
+  try {
+    onDiag(d);
+  } catch (e) {
+    Logger.warn('onDiag handler threw; ignored to keep fetch path safe:', e);
+  }
+}
+
+/**
  * Fetch calendar event data with caching support
  * This function handles both API fetching and cache retrieval
  *
@@ -61,7 +78,7 @@ export async function fetchEventData(
     const cachedEvents = getCachedEvents(cacheKey, config, isManualPageReload);
     if (cachedEvents) {
       Logger.info(`Using ${cachedEvents.length} events from cache`);
-      if (onDiag) onDiag({ processedCount: cachedEvents.length });
+      notifyDiag(onDiag, { processedCount: cachedEvents.length });
       return [...cachedEvents];
     }
   }
@@ -73,9 +90,9 @@ export async function fetchEventData(
   );
 
   const timeWindow = getTimeWindow(config.days_to_show, config.start_date);
-  if (onDiag) onDiag({ timeWindow });
+  notifyDiag(onDiag, { timeWindow });
   const fetchedEvents = await fetchEvents(hass, entities, timeWindow);
-  if (onDiag) onDiag({ rawCount: fetchedEvents.length });
+  notifyDiag(onDiag, { rawCount: fetchedEvents.length });
 
   // Process events according to configuration rules
   let processedEvents = processEvents(fetchedEvents, config);
@@ -103,7 +120,7 @@ export async function fetchEventData(
     return eventDate < limitDate;
   });
 
-  if (onDiag) onDiag({ processedCount: processedEvents.length });
+  notifyDiag(onDiag, { processedCount: processedEvents.length });
 
   // Cache and return the processed results
   cacheEvents(cacheKey, processedEvents);

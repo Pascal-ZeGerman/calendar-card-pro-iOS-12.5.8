@@ -81,12 +81,17 @@ class CalendarCardPro extends LitElement {
   @property({ attribute: false }) events: Types.CalendarEventData[] = [];
   @property({ attribute: false }) isLoading = true;
   @property({ attribute: false }) isExpanded = false;
+  // True when the most recent updateEvents() threw before populating this.events.
+  // Drives render() to show the 'error' template (visible failure indicator) rather
+  // than the empty-state — the only way iOS 12 users see that something went wrong
+  // when no JS console is available.
+  @property({ attribute: false }) private _fetchFailed = false;
   @property({ attribute: false }) weatherForecasts: Types.WeatherForecasts = {
     daily: {},
     hourly: {},
   };
 
-  // Diagnostics state (only populated/rendered when config.debug is true).
+  // Diagnostics state (only populated/rendered when config.show_debug_panel is true).
   // Used to surface the real failure on devices without a JS console (iOS 12).
   @state() private _diag: {
     timeWindow?: { start: string; end: string };
@@ -181,7 +186,7 @@ class CalendarCardPro extends LitElement {
     // In debug mode, capture uncaught errors so they appear in the on-screen
     // diagnostics panel even when they happen outside our try/catch blocks
     // (e.g. a built-in method unsupported by Safari 12, or an Intl quirk).
-    if (this.config.debug && !this._onWindowError) {
+    if (this.config.show_debug_panel && !this._onWindowError) {
       this._onWindowError = (ev: ErrorEvent) => {
         const detail = ev.error && ev.error.stack ? ev.error.stack : ev.message;
         this._recordGlobalError(`window.onerror: ${detail}`);
@@ -579,7 +584,7 @@ class CalendarCardPro extends LitElement {
         this.config,
         this._instanceId,
         force,
-        this.config.debug ? (d) => this._recordFetchDiag(d) : undefined,
+        this.config.show_debug_panel ? (d) => this._recordFetchDiag(d) : undefined,
       );
 
       // Critical: Complete loading state before updating events
@@ -589,12 +594,16 @@ class CalendarCardPro extends LitElement {
       // Finally set events data
       this.events = [...eventData];
       this._lastUpdateTime = Date.now();
+      this._fetchFailed = false;
 
       Logger.info('Event update completed successfully');
     } catch (error) {
       Logger.error('Failed to update events:', error);
       this.isLoading = false;
-      if (this.config.debug) {
+      // Surface a visible error state on iOS 12 (no JS console) so the empty
+      // calendar state is no longer indistinguishable from a fetch failure.
+      this._fetchFailed = true;
+      if (this.config.show_debug_panel) {
         this._recordError('fetch', error);
       }
     }
@@ -649,8 +658,10 @@ class CalendarCardPro extends LitElement {
       if (this.isLoading) {
         // Loading state
         content = Render.renderCardContent('loading', this.effectiveLanguage);
-      } else if (!this.safeHass || !this.config.entities.length) {
-        // Error state - missing entities
+      } else if (!this.safeHass || !this.config.entities.length || this._fetchFailed) {
+        // Error state — missing entities OR most recent fetch threw. Surfacing
+        // fetch failure here (not just behind debug:true) is what makes the iOS 12
+        // 'No events' silent failure actually visible to end users.
         content = Render.renderCardContent('error', this.effectiveLanguage);
       } else if (this.events.length === 0) {
         // Even with no events, use the regular groupEventsByDay function
@@ -680,16 +691,28 @@ class CalendarCardPro extends LitElement {
       }
     } catch (error) {
       Logger.error('Render failed:', error);
-      if (this.config.debug) {
+      if (this.config.show_debug_panel) {
         this._recordError('render', error);
       }
-      // Fall back to the (safe) loading/empty content so the card still renders
-      content = Render.renderCardContent('loading', this.effectiveLanguage);
+      // Fall back to the 'error' template, NOT 'loading'. A stuck loading spinner
+      // gives the user no signal that anything failed and is indistinguishable
+      // from the legitimate loading state — the silent-failure pattern this whole
+      // commit was meant to eliminate.
+      content = Render.renderCardContent('error', this.effectiveLanguage);
     }
 
-    // In debug mode, prepend the diagnostics panel above the card content
-    if (this.config.debug) {
-      content = html`${this._renderDiagnosticsPanel()}${content}`;
+    // In debug mode, prepend the diagnostics panel above the card content.
+    // Wrap in its own try/catch so a bug in the panel renderer can never blank
+    // the host card it is supposed to observe — defeating the whole point of
+    // the iOS 12 safety net otherwise.
+    if (this.config.show_debug_panel) {
+      try {
+        content = html`${this._renderDiagnosticsPanel()}${content}`;
+      } catch (panelError) {
+        Logger.error('Diagnostics panel render failed:', panelError);
+        // Leave content alone — render the card without the panel rather than
+        // let a diagnostics bug take down the calendar it is debugging.
+      }
     }
 
     // Render main card structure with content
