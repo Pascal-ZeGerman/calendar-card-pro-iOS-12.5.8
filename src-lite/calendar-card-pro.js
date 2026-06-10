@@ -269,7 +269,11 @@ function isAllDay(ev) {
 /** Get event start as Date, or null if malformed */
 function eventStart(ev) {
   if (!ev || !ev.start) return null;
-  if (ev.start.dateTime) return new Date(ev.start.dateTime);
+  if (ev.start.dateTime) {
+    var d = new Date(ev.start.dateTime);
+    if (isNaN(d.getTime())) { console.warn('Calendar Card Pro: unparseable dateTime', ev); return null; }
+    return d;
+  }
   if (ev.start.date) return parseDate(ev.start.date);
   return null;
 }
@@ -277,7 +281,11 @@ function eventStart(ev) {
 /** Get event end as Date, or null if malformed */
 function eventEnd(ev) {
   if (!ev || !ev.end) return null;
-  if (ev.end.dateTime) return new Date(ev.end.dateTime);
+  if (ev.end.dateTime) {
+    var d = new Date(ev.end.dateTime);
+    if (isNaN(d.getTime())) { console.warn('Calendar Card Pro: unparseable dateTime', ev); return null; }
+    return d;
+  }
   if (ev.end.date) {
     /* iCal: all-day end date is exclusive, subtract 1 day */
     var d = parseDate(ev.end.date);
