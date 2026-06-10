@@ -648,6 +648,7 @@ class CalendarCardPro extends HTMLElement {
     this._styleEl = null;
     this._shellReady = false;
     this._initialized = false;
+    this._fetchPending = false;
   }
 
   connectedCallback() {
@@ -749,6 +750,8 @@ class CalendarCardPro extends HTMLElement {
 
   _fetchAndRender() {
     if (!this._hass || !this._config) return;
+    if (!this._events) this._renderMessage('Loading…'); /* I2: loading placeholder */
+    this._fetchPending = true;
     var cfg = this._config;
     var start = todayStart();
     var end = addDays(start, cfg.days_to_show);
@@ -756,9 +759,11 @@ class CalendarCardPro extends HTMLElement {
 
     var self = this;
     fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (events) {
+      self._fetchPending = false;
       self._events = events;
       self._render();
     }).catch(function (err) {
+      self._fetchPending = false;
       console.error('Calendar Card Pro: fetch failed:', err);
       self._renderMessage('Calendar data unavailable');
     });
@@ -809,22 +814,23 @@ class CalendarCardPro extends HTMLElement {
     }
 
     cfg._entities = normaliseEntities(cfg.entities);
-    cfg._currentDays = cfg.compact_days_to_show;
+    /* I3: preserve expand state across config reloads */
+    cfg._currentDays = this._isExpanded ? cfg.days_to_show : cfg.compact_days_to_show;
 
     this._config = cfg;
-    this._isExpanded = false;
 
-    /* If already in DOM, rebuild styles and re-render */
+    /* If already in DOM, rebuild styles, reset timer (I6), and re-render */
     if (this._shellReady && this._styleEl) {
       this._styleEl.textContent = buildStyles(cfg);
+      this._startRefreshTimer();
       this._fetchAndRender();
     }
   }
 
   set hass(value) {
-    var firstSet = !this._hass;
+    var needsFetch = !this._hass || (this._events === null && !this._fetchPending); /* I4: retry after error */
     this._hass = value;
-    if (firstSet && this._config) {
+    if (needsFetch && this._config) {
       this._fetchAndRender();
     }
   }
