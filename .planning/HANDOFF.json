@@ -1,61 +1,21 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-10T19:15:00Z",
+  "timestamp": "2026-06-10T20:21:19.337Z",
+  "source": "auto-postool",
+  "partial": true,
   "phase": null,
-  "phase_name": "PR #1 bug fixes — post-review",
+  "phase_name": null,
   "phase_dir": null,
   "plan": null,
-  "task": 3,
-  "total_tasks": 6,
-  "status": "paused",
-  "completed_tasks": [
-    {
-      "id": 1,
-      "name": "NaN date guards in eventStart and eventEnd (C3)",
-      "status": "done",
-      "commit": "81f12af",
-      "note": "Spec reviewer flagged advisory gap: test stubs omit console.warn assertion. Production code is correct."
-    },
-    {
-      "id": 2,
-      "name": "Extract renderEventTimeText helper; fix renderCard (C2, C4)",
-      "status": "done",
-      "commit": "pending",
-      "note": "Helper extracted after monthShort. renderCard time block replaced. 7 tests pass."
-    }
-  ],
-  "remaining_tasks": [
-    {"id": 3, "name": "Add _renderMessage; fix fetch-failure error surface (C1, I1)", "status": "not_started"},
-    {"id": 4, "name": "Loading placeholder, expand-state persistence, stale-hass re-render (I2, I3, I4, I6)", "status": "not_started"},
-    {"id": 5, "name": "Validate entity entries; throw on zero valid entities (I5)", "status": "not_started"},
-    {"id": 6, "name": "Comment fixes (verify-bundle.sh, helpers.ts, calendar-card-pro.js)", "status": "not_started"}
-  ],
+  "task": null,
+  "total_tasks": null,
+  "status": "auto-checkpoint",
+  "completed_tasks": [],
+  "remaining_tasks": [],
   "blockers": [],
-  "human_actions_pending": [
-    {
-      "action": "After all 6 tasks complete: browser test on iOS 12.5.8 device",
-      "context": "DOM-dependent changes (Tasks 3-4) cannot be verified by Node.js tests",
-      "blocking": false
-    }
-  ],
-  "decisions": [
-    {
-      "decision": "Approach B: extract renderEventTimeText + _renderMessage helpers",
-      "rationale": "User chose B — cleaner renderCard inner loop, time logic testable in isolation",
-      "phase": "PR1-bug-fixes"
-    },
-    {
-      "decision": "Fix scope: all 10 findings (C1-C4 + I1-I6 + comment fixes)",
-      "rationale": "User chose full scope during brainstorming",
-      "phase": "PR1-bug-fixes"
-    },
-    {
-      "decision": "Task 1 spec reviewer advisory gap: accept and move on",
-      "rationale": "Test stubs don't call console.warn — production code does. Low risk.",
-      "phase": "PR1-bug-fixes"
-    }
-  ],
+  "human_actions_pending": [],
+  "decisions": [],
   "uncommitted_files": [],
-  "next_action": "Start Task 3: add _renderMessage helper; fix fetch-failure error surface (C1, I1). Branch: gsd/phase-01-build-pipeline.",
-  "context_notes": "Task 2 done. renderEventTimeText extracted after monthShort (section 3). renderCard time block: 25 lines → 15 lines using helper. Uses eventEnd() for C4 fix. isContinuation flag for multi-day timed events. 7 tests in tests/test-render-event-time-text.js."
+  "next_action": null,
+  "context_notes": ""
 }
