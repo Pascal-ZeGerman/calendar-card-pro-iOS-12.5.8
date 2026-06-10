@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-10T18:58:22Z",
+  "phase": null,
+  "phase_name": "PR #1 bug fixes — post-review",
+  "phase_dir": null,
+  "plan": null,
+  "task": 2,
+  "total_tasks": 6,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "NaN date guards in eventStart and eventEnd (C3)",
+      "status": "done",
+      "commit": "81f12af",
+      "note": "Spec reviewer flagged advisory gap: test stubs omit console.warn assertion. Production code is correct."
+    }
+  ],
+  "remaining_tasks": [
+    {"id": 2, "name": "Extract renderEventTimeText helper; fix renderCard (C2, C4)", "status": "not_started"},
+    {"id": 3, "name": "Add _renderMessage; fix fetch-failure error surface (C1, I1)", "status": "not_started"},
+    {"id": 4, "name": "Loading placeholder, expand-state persistence, stale-hass re-render (I2, I3, I4, I6)", "status": "not_started"},
+    {"id": 5, "name": "Validate entity entries; throw on zero valid entities (I5)", "status": "not_started"},
+    {"id": 6, "name": "Comment fixes (verify-bundle.sh, helpers.ts, calendar-card-pro.js)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {
+      "action": "After all 6 tasks complete: browser test on iOS 12.5.8 device",
+      "context": "DOM-dependent changes (Tasks 3-4) cannot be verified by Node.js tests",
+      "blocking": false
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Approach B: extract renderEventTimeText + _renderMessage helpers",
+      "rationale": "User chose B — cleaner renderCard inner loop, time logic testable in isolation",
+      "phase": "PR1-bug-fixes"
+    },
+    {
+      "decision": "Fix scope: all 10 findings (C1-C4 + I1-I6 + comment fixes)",
+      "rationale": "User chose full scope during brainstorming",
+      "phase": "PR1-bug-fixes"
+    },
+    {
+      "decision": "Task 1 spec reviewer advisory gap: accept and move on",
+      "rationale": "Test stubs don't call console.warn — production code does. Low risk.",
+      "phase": "PR1-bug-fixes"
+    }
+  ],
+  "uncommitted_files": [],
+  "next_action": "Dispatch implementer subagent for Task 2 (renderEventTimeText). Branch is gsd/phase-01-build-pipeline. Plan at docs/superpowers/plans/2026-06-09-pr1-bug-fixes.md.",
+  "context_notes": "Using superpowers:subagent-driven-development. Task 1 done at 81f12af. Resume by reading plan Task 2 text and dispatching implementer subagent (model: sonnet)."
+}
