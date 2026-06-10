@@ -759,7 +759,8 @@ class CalendarCardPro extends HTMLElement {
       self._events = events;
       self._render();
     }).catch(function (err) {
-      console.error('Calendar Card Pro: render failed:', err);
+      console.error('Calendar Card Pro: fetch failed:', err);
+      self._renderMessage('Calendar data unavailable');
     });
   }
 
@@ -774,6 +775,17 @@ class CalendarCardPro extends HTMLElement {
     }
 
     this._container.appendChild(renderCard(days, cfg));
+  }
+
+  _renderMessage(text) {
+    if (!this._container) return;
+    while (this._container.firstChild) {
+      this._container.removeChild(this._container.firstChild);
+    }
+    var msg = document.createElement('div');
+    msg.style.cssText = 'padding:16px 8px;color:var(--secondary-text-color);font-size:14px;';
+    msg.textContent = text;
+    this._container.appendChild(msg);
   }
 
   /* --- HA lifecycle --- */
