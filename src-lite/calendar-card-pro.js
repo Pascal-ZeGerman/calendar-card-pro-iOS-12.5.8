@@ -331,6 +331,20 @@ function monthShort(date) {
   }
 }
 
+/** Return display text for an event's time slot (pure — no DOM side-effects) */
+function renderEventTimeText(ev, cfg, use24h, isContinuation) {
+  if (isAllDay(ev)) return 'All day';
+  if (isContinuation) return 'Continues';
+  var start = eventStart(ev);
+  if (!start) return '';
+  var text = formatTime(start, use24h);
+  if (cfg.show_end_time) {
+    var end = eventEnd(ev);
+    if (end) text = text + ' – ' + formatTime(end, use24h);
+  }
+  return text;
+}
+
 /* ================================================
    4. DATA FETCHING
    ================================================ */
@@ -554,30 +568,20 @@ function renderCard(days, cfg) {
         var tlContainer = el('div', 'time-location');
 
         /* Time */
-        if (cfg.show_time && !isAllDay(ev)) {
-          var timeDiv = el('div', 'time');
-          var icon = document.createElement('ha-icon');
-          icon.setAttribute('icon', 'mdi:clock-outline');
-          timeDiv.appendChild(icon);
-          var timeSpan = document.createElement('span');
-          var startTime = formatTime(eventStart(ev), use24h);
-          if (cfg.show_end_time && ev.end.dateTime) {
-            var endTime = formatTime(new Date(ev.end.dateTime), use24h);
-            timeSpan.textContent = startTime + ' - ' + endTime;
-          } else {
-            timeSpan.textContent = startTime;
+        if (cfg.show_time || isAllDay(ev)) {
+          var evStart = eventStart(ev);
+          var isContinuation = !isAllDay(ev) && !!evStart && dateKey(evStart) !== key;
+          var timeText = renderEventTimeText(ev, cfg, use24h, isContinuation);
+          if (timeText) {
+            var timeDiv = el('div', 'time');
+            var icon = document.createElement('ha-icon');
+            icon.setAttribute('icon', 'mdi:clock-outline');
+            timeDiv.appendChild(icon);
+            var timeSpan = document.createElement('span');
+            timeSpan.textContent = timeText;
+            timeDiv.appendChild(timeSpan);
+            tlContainer.appendChild(timeDiv);
           }
-          timeDiv.appendChild(timeSpan);
-          tlContainer.appendChild(timeDiv);
-        } else if (isAllDay(ev)) {
-          var timeDiv = el('div', 'time');
-          var icon = document.createElement('ha-icon');
-          icon.setAttribute('icon', 'mdi:clock-outline');
-          timeDiv.appendChild(icon);
-          var timeSpan = document.createElement('span');
-          timeSpan.textContent = 'All day';
-          timeDiv.appendChild(timeSpan);
-          tlContainer.appendChild(timeDiv);
         }
 
         /* Location */
