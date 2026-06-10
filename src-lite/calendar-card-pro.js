@@ -228,10 +228,16 @@ function buildStyles(cfg) {
 /** Normalise entity config to array of {entity, color, label} */
 function normaliseEntities(raw) {
   if (!raw || !Array.isArray(raw)) return [];
-  return raw.map(function (e) {
-    if (typeof e === 'string') return { entity: e, color: null, label: null };
-    return { entity: e.entity, color: e.color || null, label: e.label || null };
-  });
+  return raw.reduce(function (acc, e) {
+    if (typeof e === 'string' && e) {
+      acc.push({ entity: e, color: null, label: null });
+    } else if (e && typeof e === 'object' && typeof e.entity === 'string' && e.entity) {
+      acc.push({ entity: e.entity, color: e.color || null, label: e.label || null });
+    } else {
+      console.warn('Calendar Card Pro: invalid entity entry skipped:', e);
+    }
+    return acc;
+  }, []);
 }
 
 /** Get start-of-day Date for today (local) */
@@ -814,6 +820,9 @@ class CalendarCardPro extends HTMLElement {
     }
 
     cfg._entities = normaliseEntities(cfg.entities);
+    if (!cfg._entities.length) {
+      throw new Error('Calendar Card Pro: no valid entity entries — check your config');
+    }
     /* I3: preserve expand state across config reloads */
     cfg._currentDays = this._isExpanded ? cfg.days_to_show : cfg.compact_days_to_show;
 
