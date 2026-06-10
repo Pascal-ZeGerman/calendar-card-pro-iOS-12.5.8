@@ -58,7 +58,7 @@ fi
 ACTUAL_SIZE_KB=$(du -k "$BUNDLE" | cut -f1)
 MAX_SIZE_KB=312  # Calibrated: first successful build was 260KB; ceiling = ceil(260 * 1.2) = 312KB
 if [ "$MAX_SIZE_KB" -eq 9999 ]; then
-  echo "INFO: Bundle size: ${ACTUAL_SIZE_KB}KB (size ceiling not yet calibrated — update MAX_SIZE_KB after first build)"
+  echo "INFO: Bundle size: ${ACTUAL_SIZE_KB}KB (size ceiling disabled — set MAX_SIZE_KB to a real value to enable)"
 elif [ "$ACTUAL_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
   echo "FAIL: Bundle size ${ACTUAL_SIZE_KB}KB exceeds ceiling ${MAX_SIZE_KB}KB"
   FAIL=1

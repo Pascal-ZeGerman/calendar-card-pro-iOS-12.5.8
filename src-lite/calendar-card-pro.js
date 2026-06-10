@@ -756,7 +756,7 @@ class CalendarCardPro extends HTMLElement {
 
   _fetchAndRender() {
     if (!this._hass || !this._config) return;
-    if (!this._events) this._renderMessage('Loading…'); /* I2: loading placeholder */
+    if (!this._events) this._renderMessage('Loading…');
     this._fetchPending = true;
     var cfg = this._config;
     var start = todayStart();
@@ -823,12 +823,12 @@ class CalendarCardPro extends HTMLElement {
     if (!cfg._entities.length) {
       throw new Error('Calendar Card Pro: no valid entity entries — check your config');
     }
-    /* I3: preserve expand state across config reloads */
+    /* _isExpanded preserved across config reloads; _currentDays reflects current expand state */
     cfg._currentDays = this._isExpanded ? cfg.days_to_show : cfg.compact_days_to_show;
 
     this._config = cfg;
 
-    /* If already in DOM, rebuild styles, reset timer (I6), and re-render */
+    /* If already in DOM, rebuild styles, reset timer, and re-render */
     if (this._shellReady && this._styleEl) {
       this._styleEl.textContent = buildStyles(cfg);
       this._startRefreshTimer();
@@ -837,7 +837,7 @@ class CalendarCardPro extends HTMLElement {
   }
 
   set hass(value) {
-    var needsFetch = !this._hass || (this._events === null && !this._fetchPending); /* I4: retry after error */
+    var needsFetch = !this._hass || (this._events === null && !this._fetchPending);
     this._hass = value;
     if (needsFetch && this._config) {
       this._fetchAndRender();

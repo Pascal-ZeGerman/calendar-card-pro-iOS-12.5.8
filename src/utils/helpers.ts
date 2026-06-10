@@ -1,8 +1,8 @@
 /**
  * Helper utilities for Calendar Card Pro
  *
- * General purpose utility functions for debouncing, memoization,
- * performance monitoring, and other common tasks.
+ * Color conversion, indicator-type detection, ID generation,
+ * and locale/formatting utilities.
  */
 
 //-----------------------------------------------------------------------------
