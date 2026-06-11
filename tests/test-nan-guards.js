@@ -1,35 +1,8 @@
 var assert = require('assert');
-
-function parseDate(str) {
-  var parts = str.split('-');
-  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-}
-
-function eventStart(ev) {
-  if (!ev || !ev.start) return null;
-  if (ev.start.dateTime) {
-    var d = new Date(ev.start.dateTime);
-    if (isNaN(d.getTime())) { return null; }
-    return d;
-  }
-  if (ev.start.date) return parseDate(ev.start.date);
-  return null;
-}
-
-function eventEnd(ev) {
-  if (!ev || !ev.end) return null;
-  if (ev.end.dateTime) {
-    var d = new Date(ev.end.dateTime);
-    if (isNaN(d.getTime())) { return null; }
-    return d;
-  }
-  if (ev.end.date) {
-    var d = parseDate(ev.end.date);
-    d.setDate(d.getDate() - 1);
-    return d;
-  }
-  return null;
-}
+require('./setup-globals');
+var fns = require('../src-lite/calendar-card-pro.js');
+var eventStart = fns.eventStart;
+var eventEnd = fns.eventEnd;
 
 /* Universally-unparseable string (NaN on all JS engines) */
 var badEv = { start: { dateTime: 'not-a-date' }, end: { dateTime: 'not-a-date' } };

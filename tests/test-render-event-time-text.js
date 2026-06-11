@@ -1,67 +1,7 @@
 var assert = require('assert');
-
-/* ── inline stubs matching src-lite/calendar-card-pro.js ── */
-
-function parseDate(str) {
-  var parts = str.split('-');
-  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-}
-
-function isAllDay(ev) {
-  return !!(ev && ev.start && ev.start.date && !ev.start.dateTime);
-}
-
-function eventStart(ev) {
-  if (!ev || !ev.start) return null;
-  if (ev.start.dateTime) {
-    var d = new Date(ev.start.dateTime);
-    if (isNaN(d.getTime())) return null;
-    return d;
-  }
-  if (ev.start.date) return parseDate(ev.start.date);
-  return null;
-}
-
-function eventEnd(ev) {
-  if (!ev || !ev.end) return null;
-  if (ev.end.dateTime) {
-    var d = new Date(ev.end.dateTime);
-    if (isNaN(d.getTime())) return null;
-    return d;
-  }
-  if (ev.end.date) {
-    var d = parseDate(ev.end.date);
-    d.setDate(d.getDate() - 1);
-    return d;
-  }
-  return null;
-}
-
-function formatTime(date, use24h) {
-  var opts = { hour: 'numeric', minute: '2-digit' };
-  if (use24h === true) opts.hour12 = false;
-  else if (use24h === false) opts.hour12 = true;
-  try {
-    return new Intl.DateTimeFormat(undefined, opts).format(date);
-  } catch (e) {
-    var h = date.getHours();
-    var min = date.getMinutes();
-    return h + ':' + (min < 10 ? '0' : '') + min;
-  }
-}
-
-function renderEventTimeText(ev, cfg, use24h, isContinuation) {
-  if (isAllDay(ev)) return 'All day';
-  if (isContinuation) return 'Continues';
-  var start = eventStart(ev);
-  if (!start) return '';
-  var text = formatTime(start, use24h);
-  if (cfg.show_end_time) {
-    var end = eventEnd(ev);
-    if (end) text = text + ' – ' + formatTime(end, use24h);
-  }
-  return text;
-}
+require('./setup-globals');
+var fns = require('../src-lite/calendar-card-pro.js');
+var renderEventTimeText = fns.renderEventTimeText;
 
 /* ── fixtures ── */
 

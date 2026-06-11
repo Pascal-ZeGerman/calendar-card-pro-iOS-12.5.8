@@ -1,22 +1,7 @@
 var assert = require('assert');
-
-/* ── inline stub matching src-lite/calendar-card-pro.js ── */
-
-function normaliseEntities(raw) {
-  if (!raw || !Array.isArray(raw)) return [];
-  return raw.reduce(function (acc, e) {
-    if (typeof e === 'string' && e) {
-      acc.push({ entity: e, color: null, label: null });
-    } else if (e && typeof e === 'object' && typeof e.entity === 'string' && e.entity) {
-      acc.push({ entity: e.entity, color: e.color || null, label: e.label || null });
-    } else {
-      /* invalid entries are silently skipped (console.warn in prod) */
-    }
-    return acc;
-  }, []);
-}
-
-/* ── tests ── */
+require('./setup-globals');
+var fns = require('../src-lite/calendar-card-pro.js');
+var normaliseEntities = fns.normaliseEntities;
 
 /* String entities are accepted */
 var result = normaliseEntities(['calendar.home', 'calendar.work']);

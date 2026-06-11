@@ -228,10 +228,16 @@ function buildStyles(cfg) {
 /** Normalise entity config to array of {entity, color, label} */
 function normaliseEntities(raw) {
   if (!raw || !Array.isArray(raw)) return [];
-  return raw.map(function (e) {
-    if (typeof e === 'string') return { entity: e, color: null, label: null };
-    return { entity: e.entity, color: e.color || null, label: e.label || null };
-  });
+  return raw.reduce(function (acc, e) {
+    if (typeof e === 'string' && e) {
+      acc.push({ entity: e, color: null, label: null });
+    } else if (e && typeof e === 'object' && typeof e.entity === 'string' && e.entity) {
+      acc.push({ entity: e.entity, color: e.color || null, label: e.label || null });
+    } else {
+      console.warn('Calendar Card Pro: invalid entity entry skipped:', e);
+    }
+    return acc;
+  }, []);
 }
 
 /** Get start-of-day Date for today (local) */
@@ -269,7 +275,11 @@ function isAllDay(ev) {
 /** Get event start as Date, or null if malformed */
 function eventStart(ev) {
   if (!ev || !ev.start) return null;
-  if (ev.start.dateTime) return new Date(ev.start.dateTime);
+  if (ev.start.dateTime) {
+    var d = new Date(ev.start.dateTime);
+    if (isNaN(d.getTime())) { console.warn('Calendar Card Pro: unparseable dateTime', ev); return null; }
+    return d;
+  }
   if (ev.start.date) return parseDate(ev.start.date);
   return null;
 }
@@ -277,7 +287,11 @@ function eventStart(ev) {
 /** Get event end as Date, or null if malformed */
 function eventEnd(ev) {
   if (!ev || !ev.end) return null;
-  if (ev.end.dateTime) return new Date(ev.end.dateTime);
+  if (ev.end.dateTime) {
+    var d = new Date(ev.end.dateTime);
+    if (isNaN(d.getTime())) { console.warn('Calendar Card Pro: unparseable dateTime', ev); return null; }
+    return d;
+  }
   if (ev.end.date) {
     /* iCal: all-day end date is exclusive, subtract 1 day */
     var d = parseDate(ev.end.date);
@@ -289,6 +303,7 @@ function eventEnd(ev) {
 
 /** Format time using Intl (Safari 12 native) */
 function formatTime(date, use24h) {
+  if (!date || isNaN(date.getTime())) return '';
   var opts = { hour: 'numeric', minute: '2-digit' };
   if (use24h === true) {
     opts.hour12 = false;
@@ -307,6 +322,7 @@ function formatTime(date, use24h) {
 
 /** Short weekday name */
 function weekdayShort(date) {
+  if (!date || isNaN(date.getTime())) return '';
   try {
     return new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date);
   } catch (e) {
@@ -316,11 +332,26 @@ function weekdayShort(date) {
 
 /** Short month name */
 function monthShort(date) {
+  if (!date || isNaN(date.getTime())) return '';
   try {
     return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date);
   } catch (e) {
     return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][date.getMonth()];
   }
+}
+
+/** Return display text for an event's time slot (pure — no DOM side-effects) */
+function renderEventTimeText(ev, cfg, use24h, isContinuation) {
+  if (isAllDay(ev)) return 'All day';
+  if (isContinuation) return 'Continues';
+  var start = eventStart(ev);
+  if (!start) return '';
+  var text = formatTime(start, use24h);
+  if (cfg.show_end_time) {
+    var end = eventEnd(ev);
+    if (end) text = text + ' – ' + formatTime(end, use24h);
+  }
+  return text;
 }
 
 /* ================================================
@@ -339,24 +370,32 @@ function fetchCalendarEvents(hass, entities, start, end) {
 
     var path = 'calendars/' + ec.entity + '?start=' + startISO + '&end=' + endISO;
     var p = hass.callApi('GET', path).then(function (events) {
-      if (!events || !Array.isArray(events)) return [];
-      return events.map(function (ev) {
-        ev._entityConfig = ec;
-        return ev;
-      });
+      if (!events || !Array.isArray(events)) return { events: [], failed: false };
+      return {
+        events: events.map(function (ev) {
+          ev._entityConfig = ec;
+          return ev;
+        }),
+        failed: false
+      };
     }).catch(function (err) {
       console.error('Calendar Card Pro: fetch failed for ' + ec.entity + ':', err);
-      return [];
+      return { events: [], failed: true, entity: ec.entity };
     });
     promises.push(p);
   });
 
-  return Promise.all(promises).then(function (arrays) {
+  return Promise.all(promises).then(function (results) {
     var all = [];
-    arrays.forEach(function (arr) {
-      all = all.concat(arr);
+    var failedEntities = [];
+    results.forEach(function (r) {
+      if (r.failed) {
+        failedEntities.push(r.entity);
+      } else {
+        all = all.concat(r.events);
+      }
     });
-    return all;
+    return { events: all, failedEntities: failedEntities };
   });
 }
 
@@ -546,30 +585,20 @@ function renderCard(days, cfg) {
         var tlContainer = el('div', 'time-location');
 
         /* Time */
-        if (cfg.show_time && !isAllDay(ev)) {
-          var timeDiv = el('div', 'time');
-          var icon = document.createElement('ha-icon');
-          icon.setAttribute('icon', 'mdi:clock-outline');
-          timeDiv.appendChild(icon);
-          var timeSpan = document.createElement('span');
-          var startTime = formatTime(eventStart(ev), use24h);
-          if (cfg.show_end_time && ev.end.dateTime) {
-            var endTime = formatTime(new Date(ev.end.dateTime), use24h);
-            timeSpan.textContent = startTime + ' - ' + endTime;
-          } else {
-            timeSpan.textContent = startTime;
+        if (cfg.show_time || isAllDay(ev)) {
+          var evStart = eventStart(ev);
+          var isContinuation = !isAllDay(ev) && !!evStart && dateKey(evStart) !== key;
+          var timeText = renderEventTimeText(ev, cfg, use24h, isContinuation);
+          if (timeText) {
+            var timeDiv = el('div', 'time');
+            var icon = document.createElement('ha-icon');
+            icon.setAttribute('icon', 'mdi:clock-outline');
+            timeDiv.appendChild(icon);
+            var timeSpan = document.createElement('span');
+            timeSpan.textContent = timeText;
+            timeDiv.appendChild(timeSpan);
+            tlContainer.appendChild(timeDiv);
           }
-          timeDiv.appendChild(timeSpan);
-          tlContainer.appendChild(timeDiv);
-        } else if (isAllDay(ev)) {
-          var timeDiv = el('div', 'time');
-          var icon = document.createElement('ha-icon');
-          icon.setAttribute('icon', 'mdi:clock-outline');
-          timeDiv.appendChild(icon);
-          var timeSpan = document.createElement('span');
-          timeSpan.textContent = 'All day';
-          timeDiv.appendChild(timeSpan);
-          tlContainer.appendChild(timeDiv);
         }
 
         /* Location */
@@ -618,6 +647,17 @@ function buildDateContent(date, cfg, isToday) {
   return wrap;
 }
 
+function renderMessage(container, text) {
+  if (!container) return;
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
+  var msg = document.createElement('div');
+  msg.style.cssText = 'padding:16px 8px;color:var(--secondary-text-color);font-size:14px;';
+  msg.textContent = text;
+  container.appendChild(msg);
+}
+
 /* ================================================
    7. COMPONENT (ES2015 class — required by Custom Elements v1 in Safari 12)
    ================================================ */
@@ -636,6 +676,7 @@ class CalendarCardPro extends HTMLElement {
     this._styleEl = null;
     this._shellReady = false;
     this._initialized = false;
+    this._fetchPending = false;
   }
 
   connectedCallback() {
@@ -737,22 +778,31 @@ class CalendarCardPro extends HTMLElement {
 
   _fetchAndRender() {
     if (!this._hass || !this._config) return;
+    if (!this._events) this._renderMessage('Loading…');
+    this._fetchPending = true;
     var cfg = this._config;
     var start = todayStart();
     var end = addDays(start, cfg.days_to_show);
     end.setHours(23, 59, 59, 999);
 
     var self = this;
-    fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (events) {
-      self._events = events;
-      self._render();
+    fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (result) {
+      self._fetchPending = false;
+      self._events = result.events;
+      if (result.failedEntities.length > 0 && result.events.length === 0) {
+        self._renderMessage('Calendar data unavailable');
+      } else {
+        self._render();
+      }
     }).catch(function (err) {
-      console.error('Calendar Card Pro: render failed:', err);
+      self._fetchPending = false;
+      console.error('Calendar Card Pro: fetch failed:', err);
+      self._renderMessage('Calendar data unavailable');
     });
   }
 
   _render() {
-    if (!this._container || !this._events) return;
+    if (!this._container || !this._events || !this._config) return;
     var cfg = this._config;
     var days = groupEventsByDay(this._events, cfg);
 
@@ -762,6 +812,10 @@ class CalendarCardPro extends HTMLElement {
     }
 
     this._container.appendChild(renderCard(days, cfg));
+  }
+
+  _renderMessage(text) {
+    renderMessage(this._container, text);
   }
 
   /* --- HA lifecycle --- */
@@ -785,22 +839,26 @@ class CalendarCardPro extends HTMLElement {
     }
 
     cfg._entities = normaliseEntities(cfg.entities);
-    cfg._currentDays = cfg.compact_days_to_show;
+    if (!cfg._entities.length) {
+      throw new Error('Calendar Card Pro: no valid entity entries — check your config');
+    }
+    /* _isExpanded preserved across config reloads; _currentDays reflects current expand state */
+    cfg._currentDays = this._isExpanded ? cfg.days_to_show : cfg.compact_days_to_show;
 
     this._config = cfg;
-    this._isExpanded = false;
 
-    /* If already in DOM, rebuild styles and re-render */
+    /* If already in DOM, rebuild styles, reset timer, and re-render */
     if (this._shellReady && this._styleEl) {
       this._styleEl.textContent = buildStyles(cfg);
+      this._startRefreshTimer();
       this._fetchAndRender();
     }
   }
 
   set hass(value) {
-    var firstSet = !this._hass;
+    var needsFetch = !this._hass || (this._events === null && !this._fetchPending);
     this._hass = value;
-    if (firstSet && this._config) {
+    if (needsFetch && this._config) {
       this._fetchAndRender();
     }
   }
@@ -842,3 +900,15 @@ console.info(
   'color: white; background: #03a9f4; font-weight: bold;',
   ''
 );
+
+/* CJS exports for unit tests — not evaluated in browser (no module global) */
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    normaliseEntities: normaliseEntities,
+    eventStart: eventStart,
+    eventEnd: eventEnd,
+    formatTime: formatTime,
+    renderEventTimeText: renderEventTimeText,
+    renderMessage: renderMessage
+  };
+}

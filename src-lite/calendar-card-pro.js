@@ -303,6 +303,7 @@ function eventEnd(ev) {
 
 /** Format time using Intl (Safari 12 native) */
 function formatTime(date, use24h) {
+  if (!date || isNaN(date.getTime())) return '';
   var opts = { hour: 'numeric', minute: '2-digit' };
   if (use24h === true) {
     opts.hour12 = false;
@@ -321,6 +322,7 @@ function formatTime(date, use24h) {
 
 /** Short weekday name */
 function weekdayShort(date) {
+  if (!date || isNaN(date.getTime())) return '';
   try {
     return new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date);
   } catch (e) {
@@ -330,6 +332,7 @@ function weekdayShort(date) {
 
 /** Short month name */
 function monthShort(date) {
+  if (!date || isNaN(date.getTime())) return '';
   try {
     return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date);
   } catch (e) {
@@ -367,24 +370,32 @@ function fetchCalendarEvents(hass, entities, start, end) {
 
     var path = 'calendars/' + ec.entity + '?start=' + startISO + '&end=' + endISO;
     var p = hass.callApi('GET', path).then(function (events) {
-      if (!events || !Array.isArray(events)) return [];
-      return events.map(function (ev) {
-        ev._entityConfig = ec;
-        return ev;
-      });
+      if (!events || !Array.isArray(events)) return { events: [], failed: false };
+      return {
+        events: events.map(function (ev) {
+          ev._entityConfig = ec;
+          return ev;
+        }),
+        failed: false
+      };
     }).catch(function (err) {
       console.error('Calendar Card Pro: fetch failed for ' + ec.entity + ':', err);
-      return [];
+      return { events: [], failed: true, entity: ec.entity };
     });
     promises.push(p);
   });
 
-  return Promise.all(promises).then(function (arrays) {
+  return Promise.all(promises).then(function (results) {
     var all = [];
-    arrays.forEach(function (arr) {
-      all = all.concat(arr);
+    var failedEntities = [];
+    results.forEach(function (r) {
+      if (r.failed) {
+        failedEntities.push(r.entity);
+      } else {
+        all = all.concat(r.events);
+      }
     });
-    return all;
+    return { events: all, failedEntities: failedEntities };
   });
 }
 
@@ -636,6 +647,17 @@ function buildDateContent(date, cfg, isToday) {
   return wrap;
 }
 
+function renderMessage(container, text) {
+  if (!container) return;
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
+  var msg = document.createElement('div');
+  msg.style.cssText = 'padding:16px 8px;color:var(--secondary-text-color);font-size:14px;';
+  msg.textContent = text;
+  container.appendChild(msg);
+}
+
 /* ================================================
    7. COMPONENT (ES2015 class — required by Custom Elements v1 in Safari 12)
    ================================================ */
@@ -764,10 +786,14 @@ class CalendarCardPro extends HTMLElement {
     end.setHours(23, 59, 59, 999);
 
     var self = this;
-    fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (events) {
+    fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (result) {
       self._fetchPending = false;
-      self._events = events;
-      self._render();
+      self._events = result.events;
+      if (result.failedEntities.length > 0 && result.events.length === 0) {
+        self._renderMessage('Calendar data unavailable');
+      } else {
+        self._render();
+      }
     }).catch(function (err) {
       self._fetchPending = false;
       console.error('Calendar Card Pro: fetch failed:', err);
@@ -776,7 +802,7 @@ class CalendarCardPro extends HTMLElement {
   }
 
   _render() {
-    if (!this._container || !this._events) return;
+    if (!this._container || !this._events || !this._config) return;
     var cfg = this._config;
     var days = groupEventsByDay(this._events, cfg);
 
@@ -789,14 +815,7 @@ class CalendarCardPro extends HTMLElement {
   }
 
   _renderMessage(text) {
-    if (!this._container) return;
-    while (this._container.firstChild) {
-      this._container.removeChild(this._container.firstChild);
-    }
-    var msg = document.createElement('div');
-    msg.style.cssText = 'padding:16px 8px;color:var(--secondary-text-color);font-size:14px;';
-    msg.textContent = text;
-    this._container.appendChild(msg);
+    renderMessage(this._container, text);
   }
 
   /* --- HA lifecycle --- */
@@ -881,3 +900,15 @@ console.info(
   'color: white; background: #03a9f4; font-weight: bold;',
   ''
 );
+
+/* CJS exports for unit tests — not evaluated in browser (no module global) */
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    normaliseEntities: normaliseEntities,
+    eventStart: eventStart,
+    eventEnd: eventEnd,
+    formatTime: formatTime,
+    renderEventTimeText: renderEventTimeText,
+    renderMessage: renderMessage
+  };
+}

@@ -1,6 +1,9 @@
 var assert = require('assert');
+require('./setup-globals');
+var fns = require('../src-lite/calendar-card-pro.js');
+var renderMessage = fns.renderMessage;
 
-/* ── minimal DOM stubs ── */
+/* ── minimal container stub ── */
 
 function makeContainer() {
   var children = [];
@@ -15,53 +18,27 @@ function makeContainer() {
   };
 }
 
-function makeElement() {
-  return {
-    style: { cssText: '' },
-    textContent: '',
-    _tag: 'div'
-  };
-}
-
-/* Stub document.createElement */
-var globalDoc = {
-  createElement: function () { return makeElement(); }
-};
-
-/* ── inline _renderMessage (extracted from class method for unit testing) ── */
-
-function renderMessage(container, doc, text) {
-  if (!container) return;
-  while (container.firstChild) {
-    container.removeChild(container.firstChild);
-  }
-  var msg = doc.createElement('div');
-  msg.style.cssText = 'padding:16px 8px;color:var(--secondary-text-color);font-size:14px;';
-  msg.textContent = text;
-  container.appendChild(msg);
-}
-
 /* ── tests ── */
 
 /* Basic: message appended with correct text */
 var c1 = makeContainer();
-renderMessage(c1, globalDoc, 'Calendar data unavailable');
+renderMessage(c1, 'Calendar data unavailable');
 assert.strictEqual(c1._children.length, 1, 'exactly one child appended');
 assert.strictEqual(c1._children[0].textContent, 'Calendar data unavailable', 'text content matches');
 
 /* Old content is cleared before new message */
 var c2 = makeContainer();
-var existing = makeElement();
+var existing = { style: { cssText: '' }, textContent: '' };
 c2.appendChild(existing);
 assert.strictEqual(c2._children.length, 1, 'pre-condition: one existing child');
-renderMessage(c2, globalDoc, 'Error');
+renderMessage(c2, 'Error');
 assert.strictEqual(c2._children.length, 1, 'old child replaced, not accumulated');
 assert.strictEqual(c2._children[0].textContent, 'Error', 'new message text correct');
 
 /* Null container is a no-op (no crash) */
 var noCrash = false;
 try {
-  renderMessage(null, globalDoc, 'anything');
+  renderMessage(null, 'anything');
   noCrash = true;
 } catch (e) {
   noCrash = false;
@@ -70,7 +47,7 @@ assert.ok(noCrash, 'null container does not throw');
 
 /* Style includes secondary-text-color token */
 var c3 = makeContainer();
-renderMessage(c3, globalDoc, 'msg');
+renderMessage(c3, 'msg');
 assert.ok(
   c3._children[0].style.cssText.indexOf('secondary-text-color') !== -1,
   'style includes --secondary-text-color'
