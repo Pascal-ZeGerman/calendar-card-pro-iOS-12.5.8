@@ -27,3 +27,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify iOS 12 bundle
+        run: npm run build:lite

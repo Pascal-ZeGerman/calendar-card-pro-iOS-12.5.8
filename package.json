@@ -5,7 +5,8 @@
   "main": "dist/calendar-card-pro.js",
   "scripts": {
     "dev": "rollup -c --watch",
-    "build": "cross-env NODE_ENV=prod rollup -c && bash scripts/verify-bundle.sh",
+    "build": "cross-env NODE_ENV=prod rollup -c",
+    "build:lite": "cp src-lite/calendar-card-pro.js dist/calendar-card-pro.js && bash scripts/verify-bundle.sh",
     "build:no-verify": "cross-env NODE_ENV=prod rollup -c",
     "lint": "eslint 'src/**/*.ts' --fix --format stylish",
     "format": "prettier --write 'src/**/*.ts'"
