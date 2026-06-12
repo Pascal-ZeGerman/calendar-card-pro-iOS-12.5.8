@@ -5,7 +5,10 @@
   "main": "dist/calendar-card-pro.js",
   "scripts": {
     "dev": "rollup -c --watch",
-    "build": "cross-env NODE_ENV=prod rollup -c",
+    "build": "cross-env NODE_ENV=prod rollup -c && bash scripts/verify-bundle.sh",
+    "build:lite": "cp src-lite/calendar-card-pro.js dist/calendar-card-pro.js && bash scripts/verify-bundle.sh",
+    "build:no-verify": "cross-env NODE_ENV=prod rollup -c",
+    "test": "node tests/test-nan-guards.js && node tests/test-normalise-entities.js && node tests/test-render-event-time-text.js && node tests/test-render-message.js",
     "lint": "eslint 'src/**/*.ts' --fix --format stylish",
     "format": "prettier --write 'src/**/*.ts'"
   },
@@ -34,11 +37,11 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-replace": "^6.0.2",
-    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "^22.13.5",
-    "@typescript-eslint/eslint-plugin": "^8.25.0",
-    "@typescript-eslint/parser": "^8.25.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
+    "@typescript-eslint/parser": "^8.61.0",
     "cross-env": "^7.0.3",
     "esbuild": "^0.25.2",
     "eslint": "^9.21.0",
@@ -46,13 +49,20 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-prettier": "^5.2.3",
     "prettier": "^3.5.2",
-    "rollup": "^4.34.8",
+    "rollup": "^4.61.1",
     "rollup-plugin-esbuild": "^6.2.1",
     "typescript": "^5.7.3"
   },
   "dependencies": {
     "@material/web": "^2.2.0",
     "@mdi/js": "^7.4.47",
-    "dayjs": "^1.11.13"
+    "dayjs": "^1.11.13",
+    "lit": "2.8.0"
+  },
+  "overrides": {
+    "lit": "2.8.0",
+    "lit-element": "3.3.3",
+    "lit-html": "2.8.0",
+    "@lit/reactive-element": "1.6.3"
   }
 }

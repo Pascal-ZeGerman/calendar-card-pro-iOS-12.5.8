@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2019",
     "module": "ESNext",
     "moduleResolution": "Node",
-    "lib": ["ES2017", "DOM", "DOM.Iterable"],
+    "lib": ["ES2019", "DOM", "DOM.Iterable"],
     "strict": true,
     "noImplicitAny": false,
     "noUnusedParameters": true,
@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,

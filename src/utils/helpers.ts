@@ -1,8 +1,8 @@
 /**
  * Helper utilities for Calendar Card Pro
  *
- * General purpose utility functions for debouncing, memoization,
- * performance monitoring, and other common tasks.
+ * Color conversion, indicator-type detection, ID generation,
+ * and locale/formatting utilities.
  */
 
 //-----------------------------------------------------------------------------
@@ -114,10 +114,8 @@ export function getTodayIndicatorType(value: string | boolean): string {
       return 'image';
     }
 
-    // Check if it's an emoji (this is an approximation)
-    // More sophisticated emoji detection could be added if needed
-    const emojiRegex = /[\p{Emoji}]/u;
-    if (emojiRegex.test(value)) {
+    // Check if it's an emoji using isEmoji() helper (uses explicit Unicode ranges, Safari 12 compatible)
+    if (isEmoji(value)) {
       return 'emoji';
     }
 
