@@ -1,17 +1,12 @@
 <a name="top"></a>
 
-# Calendar Card Pro for Home Assistant
+# Calendar Card Pro — iOS 12.5.8 Edition
 
-[![hacs][hacs-img]][hacs-url] [![GitHub Release][github-release-img]][github-release-url] [![Downloads][github-downloads-img]][github-release-url] [![Downloads@latest][github-latest-downloads-img]][github-release-url]
+[![hacs][hacs-img]][hacs-url] [![GitHub Release][github-release-img]][github-release-url]
+
+> **Fork notice:** This is an unofficial iOS 12.5.8-compatible fork of [Calendar Card Pro](https://github.com/alexpfau/calendar-card-pro) by [@alexpfau](https://github.com/alexpfau). It replaces the Lit/TypeScript build with a dependency-free vanilla JS implementation that runs on Safari 12 (iOS 12.5.8 and older iPhones/iPads). All upstream features from v3.1.0 are preserved.
 
 <img src="https://raw.githubusercontent.com/alexpfau/calendar-card-pro/main/.github/img/header.png" alt="Calendar Card Pro Preview" width="100%">
-
-## ☕ Support This Project
-
-If you find **Calendar Card Pro** useful, consider supporting its development:
-
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/alexpfau)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-30363d?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/alexpfau)
 
 <p>&nbsp;</p>
 
@@ -60,9 +55,17 @@ Built with **performance in mind**, the card leverages **intelligent refresh mec
 
 ## 2️⃣ What's New
 
-**➡️ View the [Full Release Notes](./docs/RELEASE_NOTES.md) for a complete list of features.**
+### v3.1.0-ios12 (This Fork)
 
-### Latest Release: v3.0
+- **🍎 iOS 12.5.8 Compatibility**: Full rewrite as dependency-free vanilla JS targeting Safari 12. No Lit, no TypeScript runtime — works on older iPhones and iPads that are stuck on iOS 12.
+- **🐛 Bug Fixes from PR Review**: fetch errors surfaced in the card UI, entity validation with clear errors, expand-state persistence across re-renders, `hass` retry on late connection, timer reset on config changes.
+- Based on upstream **v3.1.0** — all features below are present.
+
+---
+
+**➡️ View the [Full Release Notes](./docs/RELEASE_NOTES.md) for upstream feature history.**
+
+### Upstream v3.0
 
 - **⚙️ Visual Configuration Editor**: New visual editor for easy, guided configuration, with smart validation and auto-upgrade of deprecated settings
 - **🌦️ Weather Integration**: Display [weather forecasts](#weather-integration) alongside your events
@@ -121,16 +124,14 @@ Built with **performance in mind**, the card leverages **intelligent refresh mec
 
 ### 📦 HACS Installation (Recommended)
 
-The easiest way to install **Calendar Card Pro** is via **[HACS (Home Assistant Community Store)](https://hacs.xyz/)**.
-
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alexpfau&repository=calendar-card-pro&category=plugin)
+The easiest way to install **Calendar Card Pro iOS 12.5.8 Edition** is via **[HACS (Home Assistant Community Store)](https://hacs.xyz/)**.
 
 #### Steps:
 
 1. Ensure **[HACS](https://hacs.xyz/docs/setup/download)** is installed in Home Assistant.
 2. Go to **HACS → Frontend → Custom Repositories**.
-3. Add this repository: `https://github.com/alexpfau/calendar-card-pro` as type `Dashboard`
-4. Install **Calendar Card Pro** from HACS.
+3. Add this repository: `https://github.com/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8` as type `Dashboard`
+4. Install **Calendar Card Pro (iOS 12.5.8 Edition)** from HACS.
 5. **Clear your browser cache** and reload Home Assistant.
 
 ### 📂 Manual Installation
@@ -141,7 +142,7 @@ The easiest way to install **Calendar Card Pro** is via **[HACS (Home Assistant 
 #### Steps:
 
 1. **Download** the latest release:  
-   👉 [calendar-card-pro.js](https://github.com/alexpfau/calendar-card-pro/releases/latest)
+   👉 [calendar-card-pro.js](https://github.com/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8/releases/latest)
 
 2. **Move the file** to your Home Assistant `www` folder:  
    /config/www/
@@ -1397,45 +1398,14 @@ refresh_interval: 15 # Auto-refresh events every 15 minutes
 
 <p align="right"><a href="#top">⬆️ back to top</a></p>
 
-## 8️⃣ Contributing & Roadmap
+## 8️⃣ Contributing & Translations
 
-### 🚀 How to Contribute
+### About This Fork
 
-Want to improve **Calendar Card Pro**? I welcome contributions of all kinds—whether it’s **fixing bugs, improving performance, or adding new features**!
+This repository maintains the **iOS 12.5.8 compatibility layer** on top of upstream Calendar Card Pro. The vanilla JS source lives in `src-lite/calendar-card-pro.js`.
 
-#### Getting Started
-
-1. **Fork this repo** and clone it locally.
-2. **Install dependencies**:
-   ```sh
-   npm install
-   ```
-3. **Start development**:
-   ```sh
-   npm run dev
-   ```
-4. **Open a Pull Request** with your changes.
-
-💡 For detailed contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-### 📅 Roadmap & Planned Features
-
-I am continuously working on improving **Calendar Card Pro**. Here’s what’s planned for upcoming releases:
-
-- **Enhanced Event Details** – Support for event descriptions, and more.
-- **New Features & Improvements** - Feature Requests as proposed by community members.
-- **Expanded Language Support** – Adding more languages (looking for community translations).
-
-💡 Got a feature request? **Open a GitHub Issue** or start a **discussion**!
-
-### 📖 Developer Documentation
-
-For those interested in contributing code, I maintain detailed **[architecture documentation](./docs/architecture.md)** that explains:
-
-- **Code Organization** – Structure and module responsibilities.
-- **Data Flow & Processing** – How events are fetched, stored, and displayed.
-- **Performance Optimization** – Techniques for fast rendering and caching.
-- **Design Principles** – Best practices for UI consistency and accessibility.
+- **Feature requests and upstream improvements** → [alexpfau/calendar-card-pro](https://github.com/alexpfau/calendar-card-pro)
+- **iOS 12 compatibility bugs** → [Open an issue here](https://github.com/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8/issues)
 
 ### 🌍 Adding Translations
 
@@ -1498,8 +1468,6 @@ To add a new language:
  <!--Badges-->
 
 [hacs-img]: https://img.shields.io/badge/HACS-Custom-orange.svg
-[hacs-url]: https://github.com/alexpfau/calendar-card-pro/actions/workflows/hacs-validate.yml
-[github-release-img]: https://img.shields.io/github/release/alexpfau/calendar-card-pro.svg
-[github-downloads-img]: https://img.shields.io/github/downloads/alexpfau/calendar-card-pro/total.svg
-[github-latest-downloads-img]: https://img.shields.io/github/downloads/alexpfau/calendar-card-pro/latest/total.svg
-[github-release-url]: https://github.com/alexpfau/calendar-card-pro/releases
+[hacs-url]: https://github.com/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8
+[github-release-img]: https://img.shields.io/github/release/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8.svg
+[github-release-url]: https://github.com/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8/releases
