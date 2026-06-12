@@ -41,7 +41,7 @@ export default {
     json(),
     esbuild({
       tsconfig: 'tsconfig.json',
-      target: 'es2017',
+      target: 'safari12',
       sourceMap: true,
     }),
     resolve(),

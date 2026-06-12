@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-11T21:46:46Z",
+  "phase": null,
+  "phase_name": "PR review fixes",
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Multi-agent PR review (silent-failure-hunter, code-reviewer, pr-test-analyzer)", "status": "done"},
+    {"id": 2, "name": "Fix build pipeline — add build:lite, dist rebuilt from src-lite", "status": "done", "commit": "c98ea53"},
+    {"id": 3, "name": "Fix fetchCalendarEvents — surface failedEntities (H1)", "status": "done", "commit": "c98ea53"},
+    {"id": 4, "name": "Add null guards to formatTime/weekdayShort/monthShort (H2)", "status": "done", "commit": "c98ea53"},
+    {"id": 5, "name": "Add !this._config guard to _render() (M1)", "status": "done", "commit": "c98ea53"},
+    {"id": 6, "name": "Extract standalone renderMessage(); _renderMessage delegates", "status": "done", "commit": "c98ea53"},
+    {"id": 7, "name": "Replace inline test stubs with real src-lite via setup-globals.js", "status": "done", "commit": "c98ea53"}
+  ],
+  "remaining_tasks": [
+    {"id": 8, "name": "Push c98ea53 to origin/fix/pr1-review-fixes to update PR #3", "status": "blocked"}
+  ],
+  "blockers": [
+    {
+      "description": "GitHub repo rule blocks push: 'Waiting for Code Scanning results. Code Scanning may not be configured for the target branch.' (GH013)",
+      "type": "human_action",
+      "workaround": "Disable the Code Scanning requirement at https://github.com/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8/rules OR add .github/workflows/codeql.yml"
+    }
+  ],
+  "human_actions_pending": [
+    {
+      "action": "Fix GitHub Code Scanning repository rule blocking push to fix/pr1-review-fixes",
+      "context": "git push rejected with GH013. Rule requires Code Scanning results but no scanner is configured — deadlock. Fix at https://github.com/Pascal-ZeGerman/calendar-card-pro-iOS-12.5.8/rules",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {"decision": "build:lite copies src-lite to dist rather than re-pointing rollup", "rationale": "keeps TypeScript build path intact"},
+    {"decision": "fetchCalendarEvents returns {events, failedEntities} instead of Event[]", "rationale": "distinguishes partial failure from total failure without breaking callers"},
+    {"decision": "Standalone renderMessage(container, text) extracted; class method delegates", "rationale": "testable without full Custom Element lifecycle"},
+    {"decision": "tests/setup-globals.js shared browser-globals shim", "rationale": "single maintenance point for all four test files"}
+  ],
+  "uncommitted_files": [".planning/HANDOFF.json", ".planning/.continue-here.md"],
+  "next_action": "After human unblocks Code Scanning rule: git push origin fix/pr1-review-fixes",
+  "context_notes": "All code fixes complete and committed locally (c98ea53). Only remaining action is push, blocked by GitHub repo rule. npm test green, verify-bundle.sh passes."
+}
