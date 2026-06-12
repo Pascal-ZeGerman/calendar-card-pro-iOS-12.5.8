@@ -17,6 +17,34 @@ import * as Helpers from './helpers';
 //-----------------------------------------------------------------------------
 
 /**
+ * Diagnostic snapshot of the fetch/process pipeline, reported incrementally via
+ * the optional onDiag callback. Used by the card's debug panel to distinguish
+ * "API returned nothing" from "events fetched but dropped during processing".
+ */
+export interface FetchDiagnostics {
+  timeWindow?: { start: Date; end: Date };
+  rawCount?: number;
+  processedCount?: number;
+}
+
+/**
+ * Invoke a diagnostics callback with hard isolation. Diagnostics observe the
+ * fetch — they must never break it, so a handler exception is swallowed (and
+ * logged) rather than propagated up the await chain.
+ */
+function notifyDiag(
+  onDiag: ((d: FetchDiagnostics) => void) | undefined,
+  d: FetchDiagnostics,
+): void {
+  if (!onDiag) return;
+  try {
+    onDiag(d);
+  } catch (e) {
+    Logger.warn('onDiag handler threw; ignored to keep fetch path safe:', e);
+  }
+}
+
+/**
  * Fetch calendar event data with caching support
  * This function handles both API fetching and cache retrieval
  *
@@ -24,6 +52,7 @@ import * as Helpers from './helpers';
  * @param config Calendar card configuration
  * @param instanceId Component instance ID for caching
  * @param force Whether to force API refresh
+ * @param onDiag Optional callback receiving pipeline diagnostics (debug mode)
  * @returns Promise resolving to calendar event data array
  */
 export async function fetchEventData(
@@ -31,6 +60,7 @@ export async function fetchEventData(
   config: Types.Config,
   instanceId: string,
   force = false,
+  onDiag?: (d: FetchDiagnostics) => void,
 ): Promise<Types.CalendarEventData[]> {
   // Generate cache key based on configuration
   const cacheKey = getBaseCacheKey(
@@ -48,6 +78,7 @@ export async function fetchEventData(
     const cachedEvents = getCachedEvents(cacheKey, config, isManualPageReload);
     if (cachedEvents) {
       Logger.info(`Using ${cachedEvents.length} events from cache`);
+      notifyDiag(onDiag, { processedCount: cachedEvents.length });
       return [...cachedEvents];
     }
   }
@@ -59,7 +90,9 @@ export async function fetchEventData(
   );
 
   const timeWindow = getTimeWindow(config.days_to_show, config.start_date);
+  notifyDiag(onDiag, { timeWindow });
   const fetchedEvents = await fetchEvents(hass, entities, timeWindow);
+  notifyDiag(onDiag, { rawCount: fetchedEvents.length });
 
   // Process events according to configuration rules
   let processedEvents = processEvents(fetchedEvents, config);
@@ -86,6 +119,8 @@ export async function fetchEventData(
     // Include event only if it starts before the limit date
     return eventDate < limitDate;
   });
+
+  notifyDiag(onDiag, { processedCount: processedEvents.length });
 
   // Cache and return the processed results
   cacheEvents(cacheKey, processedEvents);

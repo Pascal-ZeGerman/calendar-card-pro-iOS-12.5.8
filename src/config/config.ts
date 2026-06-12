@@ -27,6 +27,9 @@ export const DEFAULT_CONFIG: Types.Config = {
   split_multiday_events: false,
   language: undefined,
 
+  // Diagnostics (off by default)
+  show_debug_panel: false,
+
   // Header
   title: undefined,
   title_font_size: undefined,
