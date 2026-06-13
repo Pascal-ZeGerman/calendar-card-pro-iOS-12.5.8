@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 Milestone: v1.0 iOS 12.5.8 Compatibility — SHIPPED
 Status: Complete
-Last activity: 2026-03-29 — PR #1 updated with review fixes, deployed to HA
+Last activity: 2026-06-13 - Completed quick task 260613-m72: Make repo HACS-compliant so it can be added as a custom repository in Home Assistant
 
 Progress: [██████████] 100%
 
@@ -53,6 +53,12 @@ None.
 ### Blockers/Concerns
 
 None — all resolved.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260613-m72 | Make repo HACS-compliant so it can be added as a custom repository in Home Assistant | 2026-06-13 | 532cdb2 | [260613-m72-make-repo-hacs-compliant-so-it-can-be-ad](./quick/260613-m72-make-repo-hacs-compliant-so-it-can-be-ad/) |
 
 ## Session Continuity
 
