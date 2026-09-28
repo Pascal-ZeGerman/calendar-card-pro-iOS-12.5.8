@@ -786,18 +786,29 @@ class CalendarCardPro extends HTMLElement {
     end.setHours(23, 59, 59, 999);
 
     var self = this;
-    fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (result) {
+    return fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (result) {
       self._fetchPending = false;
-      self._events = result.events;
+      var hadPreviousEvents = !!(self._events && self._events.length > 0);
       if (result.failedEntities.length > 0 && result.events.length === 0) {
-        self._renderMessage('Calendar data unavailable');
+        /* Total fetch failure (e.g. backend/network hiccup). Don't wipe a
+           previously-successful render over a transient error — keep showing
+           the last known-good events and just log the failure. Only fall
+           back to the unavailable message if we never had data to begin with. */
+        console.error('Calendar Card Pro: fetch failed for all entities, keeping last known events:', result.failedEntities);
+        if (!hadPreviousEvents) {
+          self._events = result.events;
+          self._renderMessage('Calendar data unavailable');
+        }
       } else {
+        self._events = result.events;
         self._render();
       }
     }).catch(function (err) {
       self._fetchPending = false;
       console.error('Calendar Card Pro: fetch failed:', err);
-      self._renderMessage('Calendar data unavailable');
+      if (!(self._events && self._events.length > 0)) {
+        self._renderMessage('Calendar data unavailable');
+      }
     });
   }
 
@@ -909,6 +920,8 @@ if (typeof module !== 'undefined' && module.exports) {
     eventEnd: eventEnd,
     formatTime: formatTime,
     renderEventTimeText: renderEventTimeText,
-    renderMessage: renderMessage
+    renderMessage: renderMessage,
+    fetchCalendarEvents: fetchCalendarEvents,
+    CalendarCardPro: CalendarCardPro
   };
 }
