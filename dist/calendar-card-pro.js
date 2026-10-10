@@ -370,13 +370,14 @@ function fetchCalendarEvents(hass, entities, start, end) {
 
     var path = 'calendars/' + ec.entity + '?start=' + startISO + '&end=' + endISO;
     var p = hass.callApi('GET', path).then(function (events) {
-      if (!events || !Array.isArray(events)) return { events: [], failed: false };
+      if (!events || !Array.isArray(events)) return { events: [], failed: false, entity: ec.entity };
       return {
         events: events.map(function (ev) {
           ev._entityConfig = ec;
           return ev;
         }),
-        failed: false
+        failed: false,
+        entity: ec.entity
       };
     }).catch(function (err) {
       console.error('Calendar Card Pro: fetch failed for ' + ec.entity + ':', err);
@@ -388,14 +389,74 @@ function fetchCalendarEvents(hass, entities, start, end) {
   return Promise.all(promises).then(function (results) {
     var all = [];
     var failedEntities = [];
+    var succeeded = {};
     results.forEach(function (r) {
       if (r.failed) {
         failedEntities.push(r.entity);
       } else {
         all = all.concat(r.events);
+        succeeded[r.entity] = r.events;
       }
     });
-    return { events: all, failedEntities: failedEntities };
+    return { events: all, failedEntities: failedEntities, succeeded: succeeded };
+  });
+}
+
+/* ================================================
+   4b. LAST-KNOWN-GOOD EVENT CACHE
+   Backends such as CalDAV can take minutes to answer or time out outright.
+   Events are cached per entity (in memory, mirrored to localStorage) so a
+   freshly loaded card can paint immediately and a failing calendar falls
+   back to its own last-good events. Storage is optional: every access is
+   guarded because Safari private mode and quota errors throw.
+   ================================================ */
+
+var EVENT_CACHE_KEY = 'calendar-card-pro-lite:events:v1';
+var EVENT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function readEventCache() {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    var raw = localStorage.getItem(EVENT_CACHE_KEY);
+    var parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeEventCache(cache) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(EVENT_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    /* storage unavailable or full — the in-memory cache still works */
+  }
+}
+
+/* Cache entry = { savedAt: ms, events: [event without _entityConfig] } */
+function cacheEntryFromEvents(events) {
+  return {
+    savedAt: Date.now(),
+    events: events.map(function (ev) {
+      var copy = {};
+      Object.keys(ev).forEach(function (k) {
+        if (k !== '_entityConfig') copy[k] = ev[k];
+      });
+      return copy;
+    })
+  };
+}
+
+/* Re-attach entity config to cached events; returns [] for missing/stale entries */
+function eventsFromCacheEntry(entry, ec) {
+  if (!entry || !Array.isArray(entry.events)) return [];
+  if (typeof entry.savedAt !== 'number' || Date.now() - entry.savedAt > EVENT_CACHE_MAX_AGE_MS) return [];
+  return entry.events.map(function (ev) {
+    var copy = {};
+    Object.keys(ev).forEach(function (k) { copy[k] = ev[k]; });
+    copy._entityConfig = ec;
+    return copy;
   });
 }
 
@@ -668,6 +729,7 @@ class CalendarCardPro extends HTMLElement {
     this._hass = null;
     this._config = null;
     this._events = null;
+    this._eventCache = null;
     this._isExpanded = false;
     this._refreshTimer = null;
     this._visHandler = null;
@@ -776,31 +838,76 @@ class CalendarCardPro extends HTMLElement {
     }, interval);
   }
 
+  /* Last-known-good events for the given entity names, from the per-entity cache */
+  _cachedEventsFor(entityNames) {
+    if (!this._eventCache) this._eventCache = readEventCache();
+    var cache = this._eventCache;
+    var wanted = {};
+    entityNames.forEach(function (n) { wanted[n] = true; });
+    var out = [];
+    var seen = {};
+    this._config._entities.forEach(function (ec) {
+      if (!wanted[ec.entity] || seen[ec.entity]) return;
+      seen[ec.entity] = true;
+      out = out.concat(eventsFromCacheEntry(cache[ec.entity], ec));
+    });
+    return out;
+  }
+
   _fetchAndRender() {
     if (!this._hass || !this._config) return;
-    if (!this._events) this._renderMessage('Loading…');
-    this._fetchPending = true;
     var cfg = this._config;
+    var self = this;
+    if (!this._events) {
+      /* A fetch can take minutes (slow CalDAV). Paint cached events right away
+         instead of "Loading…" so a reloaded kiosk is never blank. */
+      var allNames = cfg._entities.map(function (ec) { return ec.entity; });
+      var cached = this._cachedEventsFor(allNames);
+      if (cached.length > 0) {
+        this._events = cached;
+        this._render();
+      } else {
+        this._renderMessage('Loading…');
+      }
+    }
+    this._fetchPending = true;
     var start = todayStart();
     var end = addDays(start, cfg.days_to_show);
     end.setHours(23, 59, 59, 999);
 
-    var self = this;
     return fetchCalendarEvents(this._hass, cfg._entities, start, end).then(function (result) {
       self._fetchPending = false;
       var hadPreviousEvents = !!(self._events && self._events.length > 0);
-      if (result.failedEntities.length > 0 && result.events.length === 0) {
-        /* Total fetch failure (e.g. backend/network hiccup). Don't wipe a
-           previously-successful render over a transient error — keep showing
-           the last known-good events and just log the failure. Only fall
-           back to the unavailable message if we never had data to begin with. */
+
+      /* Record every successfully fetched entity as its new last-known-good
+         state (including "no events"), and mirror to localStorage. */
+      if (!self._eventCache) self._eventCache = readEventCache();
+      var succeededNames = Object.keys(result.succeeded || {});
+      succeededNames.forEach(function (name) {
+        self._eventCache[name] = cacheEntryFromEvents(result.succeeded[name]);
+      });
+      if (succeededNames.length > 0) writeEventCache(self._eventCache);
+
+      /* Failed entities fall back to their own cached events, so one slow or
+         unreachable calendar never blanks (or drops events from) the rest. */
+      var fallback = result.failedEntities.length > 0 ? self._cachedEventsFor(result.failedEntities) : [];
+      var merged = result.events.concat(fallback);
+
+      if (result.failedEntities.length > 0 && merged.length === 0) {
+        /* Total fetch failure with nothing cached for the failed entities.
+           Don't wipe a previously-successful render over a transient error —
+           keep showing the last known-good events and just log the failure.
+           Only fall back to the unavailable message if we never had data. */
         console.error('Calendar Card Pro: fetch failed for all entities, keeping last known events:', result.failedEntities);
         if (!hadPreviousEvents) {
-          self._events = result.events;
+          self._events = merged;
           self._renderMessage('Calendar data unavailable');
         }
       } else {
-        self._events = result.events;
+        if (result.failedEntities.length > 0) {
+          console.error('Calendar Card Pro: using cached events for failed entities:', result.failedEntities);
+        }
+        self._events = merged;
         self._render();
       }
     }).catch(function (err) {
