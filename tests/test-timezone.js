@@ -51,7 +51,8 @@ var EV = {
   assert.strictEqual(m.resolveTimeZone(null, {}), null, 'no hass');
   assert.strictEqual(m.resolveTimeZone({}, { time_zone: 'server' }), null, 'server requested but hass has no config');
   setBrowserTz(NY);
-  assert.strictEqual(m.resolveTimeZone(hassServer, {}), null, 'zone equal to browser zone is a no-op');
+  assert.strictEqual(m.resolveTimeZone(hassServer, {}), NY,
+    'zone equal to the browser zone is still returned (Intl default zone is not trustworthy on iOS 12)');
   console.log('PASS: resolveTimeZone matrix');
 })();
 
