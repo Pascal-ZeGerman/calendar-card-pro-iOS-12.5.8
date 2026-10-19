@@ -1,6 +1,6 @@
 {
   "name": "calendar-card-pro-dev",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "description": "Custom Home Assistant calendar card",
   "main": "dist/calendar-card-pro.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "cross-env NODE_ENV=prod rollup -c",
     "build:lite": "cp src-lite/calendar-card-pro.js dist/calendar-card-pro.js && bash scripts/verify-bundle.sh",
     "build:no-verify": "cross-env NODE_ENV=prod rollup -c",
-    "test": "node tests/test-nan-guards.js && node tests/test-normalise-entities.js && node tests/test-render-event-time-text.js && node tests/test-render-message.js && node tests/test-fetch-fallback-on-failure.js && node tests/test-event-cache-persistence.js && node tests/test-timezone.js",
+    "test": "node tests/test-nan-guards.js && node tests/test-normalise-entities.js && node tests/test-render-event-time-text.js && node tests/test-render-message.js && node tests/test-fetch-fallback-on-failure.js && node tests/test-event-cache-persistence.js && node tests/test-timezone.js && node tests/test-intl-default-zone.js",
     "lint": "eslint 'src/**/*.ts' --fix --format stylish",
     "format": "prettier --write 'src/**/*.ts'"
   },

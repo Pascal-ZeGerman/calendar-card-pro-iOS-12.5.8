@@ -9,6 +9,8 @@
    1. DEFAULTS
    ================================================ */
 
+var CARD_VERSION = '3.1.3';
+
 var DEFAULTS = {
   days_to_show: 7,
   compact_days_to_show: 3,
@@ -288,7 +290,11 @@ function resolveTimeZone(hass, cfg) {
   if (opt === 'local') return null;
   var tz = opt === 'server' ? (hass && hass.config && hass.config.time_zone) : opt;
   if (!tz || typeof tz !== 'string' || !isValidTimeZone(tz)) return null;
-  return tz === browserTimeZone() ? null : tz;
+  /* Deliberately not short-circuited when tz equals the browser's reported
+     zone: Intl's reported default zone is not trustworthy on every runtime
+     (iOS 12 reports UTC while Date uses the device zone). Converting to an
+     identical zone is an identity, so always converting is safe. */
+  return tz;
 }
 
 function setActiveTimeZone(tz) {
@@ -412,30 +418,44 @@ function eventEnd(ev) {
   return null;
 }
 
-/** Format time using Intl (Safari 12 native) */
+/* Wall-clock formatting.
+
+   The Dates handed to these helpers are "zoned-local": their *local getters*
+   hold the wall clock to display. Formatting them with Intl's default zone is
+   not safe: on some runtimes (observed on iOS 12.5.8 Safari) Date follows the
+   device zone while Intl.DateTimeFormat's default zone is UTC, which showed
+   every time 4 hours late. So the wall-clock components are read from the
+   local getters and re-expressed as a UTC date, then formatted with an
+   explicit timeZone: 'UTC' — the runtime's default zone never matters. */
+
+/** Format time (locale-aware 12/24h, independent of the runtime's default zone) */
 function formatTime(date, use24h) {
   if (!date || isNaN(date.getTime())) return '';
-  var opts = { hour: 'numeric', minute: '2-digit' };
-  if (use24h === true) {
-    opts.hour12 = false;
-  } else if (use24h === false) {
-    opts.hour12 = true;
-  }
-  /* use24h === 'system' => omit hour12, let browser decide */
+  var h = date.getHours();
+  var min = date.getMinutes();
+  var mm = (min < 10 ? '0' : '') + min;
+  /* Explicit 24h: deterministic, no Intl (some engines print midnight as 24:00) */
+  if (use24h === true) return (h < 10 ? '0' : '') + h + ':' + mm;
+  var opts = { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' };
+  if (use24h === false) opts.hour12 = true;
+  /* use24h === 'system' => omit hour12, let the locale decide */
   try {
-    return new Intl.DateTimeFormat(undefined, opts).format(date);
+    return new Intl.DateTimeFormat(undefined, opts).format(new Date(Date.UTC(2000, 0, 1, h, min)));
   } catch (e) {
-    var h = date.getHours();
-    var min = date.getMinutes();
-    return h + ':' + (min < 10 ? '0' : '') + min;
+    return h + ':' + mm;
   }
+}
+
+/** Noon UTC on the wall-clock calendar day of a zoned-local Date */
+function wallDayUtc(date) {
+  return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12));
 }
 
 /** Short weekday name */
 function weekdayShort(date) {
   if (!date || isNaN(date.getTime())) return '';
   try {
-    return new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date);
+    return new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'UTC' }).format(wallDayUtc(date));
   } catch (e) {
     return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
   }
@@ -445,7 +465,7 @@ function weekdayShort(date) {
 function monthShort(date) {
   if (!date || isNaN(date.getTime())) return '';
   try {
-    return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date);
+    return new Intl.DateTimeFormat(undefined, { month: 'short', timeZone: 'UTC' }).format(wallDayUtc(date));
   } catch (e) {
     return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][date.getMonth()];
   }
@@ -1049,6 +1069,28 @@ class CalendarCardPro extends HTMLElement {
     }
 
     this._container.appendChild(renderCard(days, cfg));
+    if (cfg.debug_time_zone === true) {
+      this._container.appendChild(this._debugLine());
+    }
+  }
+
+  /* One-line, on-screen time zone diagnostic for kiosks that have no console
+     (enable with `debug_time_zone: true`). */
+  _debugLine() {
+    var hass = this._hass || {};
+    var jsOffset;
+    try { jsOffset = new Date().getTimezoneOffset(); } catch (e) { jsOffset = '?'; }
+    var d = el('div');
+    d.style.cssText = 'font:10px/1.4 monospace;opacity:0.7;padding:6px 4px 0;word-break:break-all;';
+    d.textContent = 'CCP-lite v' + CARD_VERSION +
+      ' | zone=' + (_activeTimeZone || 'browser') +
+      ' | cfg=' + this._config.time_zone +
+      ' | profile=' + (hass.locale && hass.locale.time_zone) +
+      ' | HA=' + (hass.config && hass.config.time_zone) +
+      ' | Intl=' + browserTimeZone() +
+      ' | JSoffset=' + jsOffset +
+      ' | now=' + formatTime(nowLocal(), true);
+    return d;
   }
 
   _renderMessage(text) {
@@ -1149,6 +1191,8 @@ if (typeof module !== 'undefined' && module.exports) {
     toZonedLocal: toZonedLocal,
     fromZonedLocal: fromZonedLocal,
     formatTime: formatTime,
+    weekdayShort: weekdayShort,
+    monthShort: monthShort,
     renderEventTimeText: renderEventTimeText,
     renderMessage: renderMessage,
     fetchCalendarEvents: fetchCalendarEvents,
