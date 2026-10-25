@@ -9,7 +9,7 @@
    1. DEFAULTS
    ================================================ */
 
-var CARD_VERSION = '3.1.3';
+var CARD_VERSION = '3.1.3-rc.2';
 
 var DEFAULTS = {
   days_to_show: 7,
@@ -20,6 +20,8 @@ var DEFAULTS = {
   show_location: true,
   show_month: true,
   show_past_events: false,
+  /* small "Couldn't refresh · saved …" / "Updating…" line while saved events are shown */
+  show_cache_status: true,
   time_24h: 'system',
   /* 'auto' follows HA's profile (server => hass.config.time_zone, else browser);
      also 'server', 'local', or an IANA name such as 'America/New_York' */
@@ -82,6 +84,9 @@ function buildStyles(cfg) {
     + '  -ms-overflow-style: none;'
     + '}'
     + '.content-container::-webkit-scrollbar { display: none; }'
+
+    + '.cache-status { padding: 4px 8px 0; font-size: 12px; color: var(--secondary-text-color); }'
+    + '.cache-status:empty { display: none; }'
 
     + '.card-header {'
     + '  float: left;'
@@ -592,6 +597,35 @@ function eventsFromCacheEntry(entry, ec) {
   });
 }
 
+/* Oldest usable savedAt (ms) among the named cache entries, or null */
+function oldestSavedAt(cache, entityNames) {
+  var oldest = null;
+  if (!cache) return null;
+  entityNames.forEach(function (name) {
+    var entry = cache[name];
+    var t = entry && entry.savedAt;
+    if (typeof t !== 'number' || !isFinite(t)) return;
+    if (Date.now() - t > EVENT_CACHE_MAX_AGE_MS) return;
+    if (oldest === null || t < oldest) oldest = t;
+  });
+  return oldest;
+}
+
+/* One-line status shown while the card displays saved (possibly old) events */
+function buildStatusText(kind, savedAt, now, use24h) {
+  var label;
+  if (kind === 'stale') label = "Couldn't refresh";
+  else if (kind === 'updating') label = 'Updating…';
+  else return '';
+  if (typeof savedAt !== 'number' || !isFinite(savedAt)) return label;
+  var saved = toZonedLocal(new Date(savedAt));
+  var text = formatTime(saved, use24h);
+  if (dateKey(saved) !== dateKey(toZonedLocal(new Date(now)))) {
+    text = weekdayShort(saved) + ' ' + text;
+  }
+  return label + ' · saved ' + text;
+}
+
 /* ================================================
    5. EVENT GROUPING
    ================================================ */
@@ -683,16 +717,21 @@ function el(tag, className) {
   return node;
 }
 
-function renderCard(days, cfg) {
-  var frag = document.createDocumentFragment();
-  var now = nowLocal();
-  var todayKey = dateKey(now);
+function resolveUse24h(cfg) {
   var use24h = cfg.time_24h === true || cfg.time_24h === '24';
   if (cfg.time_24h === 'system' || cfg.time_24h === undefined) {
     use24h = 'system';
   } else if (cfg.time_24h === false || cfg.time_24h === '12') {
     use24h = false;
   }
+  return use24h;
+}
+
+function renderCard(days, cfg) {
+  var frag = document.createDocumentFragment();
+  var now = nowLocal();
+  var todayKey = dateKey(now);
+  var use24h = resolveUse24h(cfg);
 
   days.forEach(function (bucket) {
     var dayDate = bucket.date;
@@ -924,7 +963,12 @@ class CalendarCardPro extends HTMLElement {
 
     var container = el('div', 'content-container');
     card.appendChild(container);
+
+    /* Sibling of the container: _render() empties the container on every pass */
+    var status = el('div', 'cache-status');
+    card.appendChild(status);
     this.shadowRoot.appendChild(card);
+    this._statusEl = status;
 
     this._container = container;
     this._card = card;
@@ -986,6 +1030,15 @@ class CalendarCardPro extends HTMLElement {
     return out;
   }
 
+  _setStatus(kind, savedAt) {
+    if (!this._statusEl || !this._config || this._config.show_cache_status === false) return;
+    this._statusEl.textContent = buildStatusText(kind, savedAt, Date.now(), resolveUse24h(this._config));
+  }
+
+  _clearStatus() {
+    if (this._statusEl) this._statusEl.textContent = '';
+  }
+
   /* Resolve and activate the display zone for this card's next computation */
   _applyTimeZone() {
     setActiveTimeZone(resolveTimeZone(this._hass, this._config));
@@ -1004,6 +1057,7 @@ class CalendarCardPro extends HTMLElement {
       if (cached.length > 0) {
         this._events = cached;
         this._render();
+        this._setStatus('updating', oldestSavedAt(this._eventCache, allNames));
       } else {
         this._renderMessage('Loading…');
       }
@@ -1024,7 +1078,10 @@ class CalendarCardPro extends HTMLElement {
       succeededNames.forEach(function (name) {
         self._eventCache[name] = cacheEntryFromEvents(result.succeeded[name]);
       });
-      if (succeededNames.length > 0) writeEventCache(self._eventCache);
+      if (succeededNames.length > 0) {
+        writeEventCache(self._eventCache);
+        self._lastSuccessAt = Date.now();
+      }
 
       /* Failed entities fall back to their own cached events, so one slow or
          unreachable calendar never blanks (or drops events from) the rest. */
@@ -1040,6 +1097,9 @@ class CalendarCardPro extends HTMLElement {
         if (!hadPreviousEvents) {
           self._events = merged;
           self._renderMessage('Calendar data unavailable');
+          self._clearStatus();
+        } else {
+          self._setStatus('stale', self._lastSuccessAt);
         }
       } else {
         if (result.failedEntities.length > 0) {
@@ -1047,12 +1107,20 @@ class CalendarCardPro extends HTMLElement {
         }
         self._events = merged;
         self._render();
+        if (result.failedEntities.length > 0) {
+          self._setStatus('stale', oldestSavedAt(self._eventCache, result.failedEntities));
+        } else {
+          self._clearStatus();
+        }
       }
     }).catch(function (err) {
       self._fetchPending = false;
       console.error('Calendar Card Pro: fetch failed:', err);
       if (!(self._events && self._events.length > 0)) {
         self._renderMessage('Calendar data unavailable');
+        self._clearStatus();
+      } else {
+        self._setStatus('stale', self._lastSuccessAt);
       }
     });
   }
@@ -1195,6 +1263,8 @@ if (typeof module !== 'undefined' && module.exports) {
     monthShort: monthShort,
     renderEventTimeText: renderEventTimeText,
     renderMessage: renderMessage,
+    oldestSavedAt: oldestSavedAt,
+    buildStatusText: buildStatusText,
     fetchCalendarEvents: fetchCalendarEvents,
     CalendarCardPro: CalendarCardPro
   };
