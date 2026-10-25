@@ -12,8 +12,6 @@ import sys
 import types
 from pathlib import Path
 
-DEFAULT_TARGET = Path(__file__).resolve().parents[2] / "ha-overrides/caldav/__init__.py"
-
 
 class ConfigEntryNotReady(Exception):
     pass
@@ -163,4 +161,9 @@ def main(path):
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_TARGET)
+    # Resolved here, not at import, so the script also works piped over stdin
+    # (`docker exec -i ... python3 - <path> < test_setup_retry.py`).
+    if len(sys.argv) > 1:
+        main(Path(sys.argv[1]))
+    else:
+        main(Path(__file__).resolve().parents[2] / "ha-overrides/caldav/__init__.py")
