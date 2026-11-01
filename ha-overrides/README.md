@@ -23,7 +23,9 @@ Changes versus upstream:
 
 `async_get_calendars()` is called by the calendar and todo platform setup. It now raises
 `PlatformNotReady` on network errors (and `DAVError`), so Home Assistant retries the
-platform with back-off. Without this, a DNS failure right after boot, even with the
+platform with back-off. `AuthorizationError` (a `DAVError` subclass) is deliberately
+**not** retried: a revoked password or wrong URL is permanent, so it propagates and fails
+the setup visibly instead of looping forever. Without this, a DNS failure right after boot, even with the
 `__init__.py` fix in place, left the platforms without entities and nothing retried them.
 Unrelated exceptions still propagate.
 

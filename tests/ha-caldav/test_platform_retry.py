@@ -26,6 +26,10 @@ class DAVError(Exception):
     pass
 
 
+class AuthorizationError(DAVError):
+    """Mirrors caldav.lib.error.AuthorizationError, a subclass of DAVError."""
+
+
 class RequestsConnectionError(Exception):
     pass
 
@@ -50,11 +54,15 @@ def _module(name, **attrs):
 
 
 class _Calendar:
+    components_error = None
+
     def __init__(self, name, components):
         self.name = name
         self._components = components
 
     def get_supported_components(self):
+        if _Calendar.components_error is not None:
+            raise _Calendar.components_error
         return self._components
 
 
@@ -84,7 +92,7 @@ def _install_stubs(with_niquests=True):
             del sys.modules[name]
     _module("caldav", DAVClient=_Client, Calendar=_Calendar, CalendarObjectResource=object)
     _module("caldav.lib")
-    _module("caldav.lib.error", DAVError=DAVError)
+    _module("caldav.lib.error", DAVError=DAVError, AuthorizationError=AuthorizationError)
     _module("requests", ConnectionError=RequestsConnectionError, Timeout=RequestsTimeout)
     if with_niquests:
         _module("niquests", ConnectionError=NiquestsConnectionError, Timeout=NiquestsTimeout)
@@ -107,9 +115,11 @@ def _get(mod):
 def main(path):
     failures = []
 
-    def expect_not_ready(label, error, with_niquests=True):
+    def expect_not_ready(label, error, with_niquests=True, where="calendars"):
         _install_stubs(with_niquests)
-        _Principal.error = error
+        _Principal.error = error if where == "calendars" else None
+        _Calendar.components_error = error if where == "components" else None
+        _Principal.calendars_result = [_Calendar("events", ["VEVENT"])]
         mod = _load(path)
         try:
             _get(mod)
@@ -129,23 +139,46 @@ def main(path):
     expect_not_ready("DAVError -> retry", DAVError("d"))
     expect_not_ready("requests error with niquests absent -> retry", RequestsConnectionError("c"), with_niquests=False)
 
-    # Unrelated programming errors must still surface, not be swallowed as a retry.
-    _install_stubs()
-    _Principal.error = ValueError("bug")
-    mod = _load(path)
-    try:
-        _get(mod)
-        failures.append("valueerror")
-        print("FAIL ValueError was swallowed")
-    except ValueError:
-        print("ok   unrelated ValueError still propagates")
-    except PlatformNotReady:
-        failures.append("valueerror")
-        print("FAIL ValueError was turned into PlatformNotReady")
+    # The per-calendar call is a separate network request and fails just as often.
+    expect_not_ready(
+        "niquests ConnectionError in get_supported_components -> retry",
+        NiquestsConnectionError("dns"),
+        where="components",
+    )
+    expect_not_ready("DAVError in get_supported_components -> retry", DAVError("d"), where="components")
+
+    # Errors that must NOT become a retry: they would loop forever with no way
+    # for the user to notice or fix them (auth) or hide programming bugs.
+    def expect_propagates(label, error, exc_type, where="calendars"):
+        _install_stubs()
+        _Principal.error = error if where == "calendars" else None
+        _Calendar.components_error = error if where == "components" else None
+        _Principal.calendars_result = [_Calendar("events", ["VEVENT"])]
+        mod = _load(path)
+        try:
+            _get(mod)
+        except PlatformNotReady:
+            failures.append(label)
+            print(f"FAIL {label}: was turned into PlatformNotReady (endless retry)")
+        except exc_type:
+            print(f"ok   {label}")
+        else:
+            failures.append(label)
+            print(f"FAIL {label}: no exception")
+
+    expect_propagates("AuthorizationError still propagates (no endless retry)", AuthorizationError("401"), AuthorizationError)
+    expect_propagates(
+        "AuthorizationError in get_supported_components still propagates",
+        AuthorizationError("401"),
+        AuthorizationError,
+        where="components",
+    )
+    expect_propagates("unrelated ValueError still propagates", ValueError("bug"), ValueError)
 
     # Healthy path: only calendars supporting the component are returned.
     _install_stubs()
     _Principal.error = None
+    _Calendar.components_error = None
     _Principal.calendars_result = [_Calendar("events", ["VEVENT"]), _Calendar("tasks", ["VTODO"])]
     mod = _load(path)
     names = [c.name for c in _get(mod)]

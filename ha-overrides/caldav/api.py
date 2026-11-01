@@ -1,7 +1,7 @@
 """Library for working with CalDAV api."""
 
 import caldav
-from caldav.lib.error import DAVError
+from caldav.lib.error import AuthorizationError, DAVError
 import requests
 
 from homeassistant.core import HomeAssistant
@@ -32,6 +32,7 @@ async def async_get_calendars(
     Called from the calendar and todo platform setup. Network errors are raised
     as PlatformNotReady so Home Assistant retries the platform with back-off;
     any other exception would leave the platform without entities for good.
+    Authorization errors are not retried (see below).
     """
 
     def _get_calendars() -> list[caldav.Calendar]:
@@ -43,6 +44,11 @@ async def async_get_calendars(
 
     try:
         return await hass.async_add_executor_job(_get_calendars)
+    except AuthorizationError:
+        # A subclass of DAVError, but permanent (revoked password, wrong URL):
+        # retrying would loop forever with no way for the user to notice. Let it
+        # propagate and fail the setup visibly, as upstream does.
+        raise
     except (*_TRANSIENT_ERRORS, DAVError) as err:
         raise PlatformNotReady(f"Unable to load CalDAV calendars: {err}") from err
 
