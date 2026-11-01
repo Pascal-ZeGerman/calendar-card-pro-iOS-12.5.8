@@ -9,7 +9,7 @@
    1. DEFAULTS
    ================================================ */
 
-var CARD_VERSION = '3.1.3-rc.2';
+var CARD_VERSION = '3.1.3-rc.4';
 
 var DEFAULTS = {
   days_to_show: 7,
