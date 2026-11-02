@@ -23,6 +23,15 @@ rebuilt `dist/calendar-card-pro.js`. `package-lock.json` is stale (`3.1.1-rc.1`)
 re-create or overwrite a published tag. The tag is cut from a commit, so the version strings in that
 commit are what the released card reports.
 
+**Rule: the release tag and the card's version value must always match, to prevent confusion about which
+build someone is running. For every PR, ask the user whether to increment the version (`package.json` and
+`CARD_VERSION`) to match the release tag that PR will be released under. Ask before opening the PR (or
+when it is raised, if the PR is already open); do not assume yes or no, and do not skip the question
+because the PR looks small or only touches tests, CI or docs. Say which version it would become (the next unused
+tag) and what it would affect (a bump changes the shipped `dist/` file; it does not change anything else).
+If the user says no, leave the version untouched and note in the PR description that the version was
+deliberately not bumped.**
+
 Therefore the order is always:
 
 1. Decide the version you are about to release (the next unused `vX.Y.Z-rc.N`; check `git tag --sort=version:refname`).
