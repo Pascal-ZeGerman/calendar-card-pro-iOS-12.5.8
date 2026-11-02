@@ -55,7 +55,6 @@ Tagging, releasing, deleting tags/releases and merging PRs are outward-facing: d
   files to the `test` script in `package.json`, or they will not run.
 - `python -I tests/ha-caldav/test_setup_retry.py` and `test_platform_retry.py`: stubbed tests for `ha-overrides/`
   (Python 3.12+; Home Assistant, `caldav` and `niquests` are stubbed, nothing to install).
-- CI (`.github/workflows/ci.yml`) is expected to run lint, `npm test`, both builds and the Python tests.
 - Fixtures must not depend on the real clock. The card drops cache entries older than 7 days against
   `Date.now()`, and `test-cache-status.js` silently started failing a week after its hardcoded date. Pin
   `Date.now()` in tests that use fixed dates.
