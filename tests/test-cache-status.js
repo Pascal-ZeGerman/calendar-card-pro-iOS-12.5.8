@@ -7,6 +7,12 @@ mod.setActiveTimeZone('UTC');
 
 /* Saved Sun 2026-10-18 14:05 UTC */
 var SAVED = Date.UTC(2026, 9, 18, 14, 5);
+
+/* The card drops cache entries older than EVENT_CACHE_MAX_AGE_MS (7 days) measured
+   against Date.now(). The fixtures above are fixed dates, so pin the clock shortly
+   after SAVED; otherwise this suite starts failing a week after the fixtures' date. */
+var FIXED_NOW = Date.UTC(2026, 9, 18, 15, 0);
+Date.now = function () { return FIXED_NOW; };
 var SAME_DAY = Date.UTC(2026, 9, 18, 20, 0);
 var NEXT_DAY = Date.UTC(2026, 9, 19, 8, 0);
 
